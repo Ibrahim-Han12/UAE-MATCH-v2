@@ -5,6 +5,7 @@
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.core.openai_client import get_openai_client
+from app.core.ai import get_ai_gateway, Task
 from app.models.user_ai_memory import UserAIMemory
 from app.models.ai_conversation import AIConversation
 
@@ -64,14 +65,17 @@ class MemoryService:
         
         # 调用GPT-4o-mini进行压缩
         try:
-            response = self.openai_client.chat_completion(
+            response = get_ai_gateway().chat(
+                db,
+                user_id=user_id,
+                task=Task.MEMORY_EXTRACTION,  # 记忆压缩 —— mini
                 messages=[
                     {"role": "system", "content": "你是一个专业的信息压缩助手，擅长从对话中提取关键信息。"},
                     {"role": "user", "content": compression_prompt}
                 ],
-                model=self.openai_client.model_gpt4o_mini,
+                scene="memory_compress",
                 temperature=0.3,  # 降低温度，确保输出稳定
-                fallback_model=self.openai_client.model_gpt35,
+                count_user_quota=False,  # 后台记忆压缩，不占用户配额
             )
             
             new_summary = response["content"].strip()

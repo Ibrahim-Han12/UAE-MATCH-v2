@@ -19,6 +19,7 @@ from app.models.user_block import UserBlock
 from app.models.match_pair import MatchPair
 from app.models.user_recommendation_quota import UserRecommendationQuota
 from app.core.openai_client import get_openai_client
+from app.core.ai import get_ai_gateway, Task
 from app.core.embedding_service import get_embedding_service
 from app.core.config import settings
 
@@ -343,14 +344,16 @@ def get_ai_recommendations(
 推荐语："""
         
         try:
-            response = openai_client.chat_completion(
+            response = get_ai_gateway().chat(
+                db,
+                user_id=current_user.id,
+                task=Task.RECOMMENDATION_ANALYSIS,  # 推荐理由生成 —— 旗舰档
                 messages=[
                     {"role": "system", "content": "你是一个专业的红娘，擅长为单身人士推荐合适的对象。不要提到性别匹配这种显而易见的内容。"},
                     {"role": "user", "content": recommendation_prompt}
                 ],
-                model=openai_client.model_gpt4o_mini,
+                scene="match_recommend",
                 temperature=0.7,
-                fallback_model=openai_client.model_gpt35,
             )
             
             recommendation_text = response["content"].strip()

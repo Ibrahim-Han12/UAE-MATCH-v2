@@ -17,9 +17,10 @@ class GlobalAIBudget(Base):
     
     # 预算上限（美元）
     budget_limit = Column(Numeric(10, 2), default=500.00, nullable=False)
-    
-    # 已用预算（美元，根据token使用量计算）
-    budget_used = Column(Numeric(10, 2), default=0.00, nullable=False)
+
+    # 已用预算（美元）。用 6 位小数：单次 mini 调用成本常为亚分级（约 0.0003 USD），
+    # 若用 2 位小数会被量化为 0.00 导致全局预算永远累加不上、熔断失效（BR-209）。
+    budget_used = Column(Numeric(12, 6), default=0.000000, nullable=False)
     
     # 修改人（管理员ID）
     modified_by = Column(Integer, nullable=True)

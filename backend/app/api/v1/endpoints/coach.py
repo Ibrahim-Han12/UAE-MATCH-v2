@@ -14,6 +14,7 @@ from app.models.match_insight_cache import MatchInsightCache
 from app.schemas.coach import MatchInsightRequest, MatchInsightResponse
 from app.core.risk import log_event, check_rate_limit
 from app.core.openai_client import get_openai_client
+from app.core.ai import get_ai_gateway, Task
 from app.core.embedding_service import get_embedding_service
 from app.core.config import settings
 from app.models.order import Subscription
@@ -270,14 +271,16 @@ def get_match_insights(
 }}"""
     
     try:
-        response = openai_client.chat_completion(
+        response = get_ai_gateway().chat(
+            db,
+            user_id=current_user.id,
+            task=Task.RECOMMENDATION_ANALYSIS,  # 兼容性/推荐分析 —— 旗舰档
             messages=[
                 {"role": "system", "content": f"你是一个专业的AI红娘，正在为你的用户分析匹配对象。请用红娘直接对用户说话的口气，使用第二人称'你们'、'你'和对方昵称'{target_name}'，而不是第三人称'他们'、'双方'或'TA'。绝对不要提到任何技术术语如'向量相似度'、'算法'等。请只返回JSON格式，不要其他文字。"},
                 {"role": "user", "content": analysis_prompt}
             ],
-            model=openai_client.model_gpt4o_mini,
+            scene="match_insights",
             temperature=0.7,
-            fallback_model=openai_client.model_gpt35,
         )
         
         # 解析AI返回的JSON

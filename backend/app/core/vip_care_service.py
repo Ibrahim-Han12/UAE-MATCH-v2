@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from app.core.openai_client import get_openai_client
+from app.core.ai import get_ai_gateway, Task
 from app.core.memory_service import get_memory_service
 from app.models.user import User
 from app.models.profile import UserProfile
@@ -228,14 +229,17 @@ class VIPCareService:
 开场白："""
         
         try:
-            response = self.openai_client.chat_completion(
+            response = get_ai_gateway().chat(
+                db,
+                user_id=user_id,
+                task=Task.PROACTIVE_CARE,  # L3 主动关怀 —— mini
                 messages=[
                     {"role": "system", "content": "你是用户专属的AI红娘'小缘'，温暖、专业、不死板。"},
                     {"role": "user", "content": prompt}
                 ],
-                model=self.openai_client.model_gpt4o_mini,
+                scene="vip_care",
                 temperature=0.8,  # 稍微提高温度，让回答更自然
-                fallback_model=self.openai_client.model_gpt35,
+                count_user_quota=False,  # 主动关怀只计成本、不占用户配额
             )
             
             return response["content"].strip()

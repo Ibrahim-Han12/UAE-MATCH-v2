@@ -69,14 +69,15 @@ class OpenAIClient:
                     timeout=30.0,  # 设置30秒超时
                 )
                 
-                content = response.choices[0].message.content
-                tokens_used = response.usage.total_tokens
-                actual_model = response.model
-                
+                usage = response.usage
+                cached = getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0
                 return {
-                    "content": content,
-                    "tokens_used": tokens_used,
-                    "model": actual_model,
+                    "content": response.choices[0].message.content,
+                    "tokens_used": usage.total_tokens,
+                    "tokens_in": getattr(usage, "prompt_tokens", 0) or 0,
+                    "tokens_out": getattr(usage, "completion_tokens", 0) or 0,
+                    "cache_hit": bool(cached),
+                    "model": response.model,
                 }
             
             except Exception as e:
@@ -187,15 +188,16 @@ class OpenAIClient:
                                 timeout=30.0,  # 设置30秒超时
                             )
                             
-                            content = fallback_response.choices[0].message.content
-                            tokens_used = fallback_response.usage.total_tokens
-                            actual_model = fallback_response.model
-                            
+                            fb_usage = fallback_response.usage
+                            fb_cached = getattr(getattr(fb_usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0
                             print(f"[OK] 降级模型 {fallback_model} 调用成功")
                             return {
-                                "content": content,
-                                "tokens_used": tokens_used,
-                                "model": actual_model,
+                                "content": fallback_response.choices[0].message.content,
+                                "tokens_used": fb_usage.total_tokens,
+                                "tokens_in": getattr(fb_usage, "prompt_tokens", 0) or 0,
+                                "tokens_out": getattr(fb_usage, "completion_tokens", 0) or 0,
+                                "cache_hit": bool(fb_cached),
+                                "model": fallback_response.model,
                             }
                         except Exception as fallback_error:
                             fallback_last_error = fallback_error

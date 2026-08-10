@@ -34,6 +34,7 @@ from app.schemas.ai_chat import (
     AIRecommendationResponse,
 )
 from app.core.openai_client import get_openai_client
+from app.core.ai import get_ai_gateway, Task
 from app.core.config import settings
 from app.core.memory_service import get_memory_service
 from app.core.embedding_service import get_embedding_service
@@ -324,20 +325,19 @@ def send_message(
         current_message=request.message,
     )
     
-    # 选择模型：全部使用GPT-4o-mini（成本低、速度快、性能好）
-    # 如果GPT-4o-mini不可用，会自动降级到GPT-3.5-turbo
-    model = openai_client.model_gpt4o_mini
-    fallback_model = openai_client.model_gpt35
-    
-    # 调用OpenAI API
+    # 通过模型抽象层调用（按任务路由 + 计量 BR-209；预算 100% 自动降级 mini）
+    task = Task.REGISTRATION if request.conversation_type == "registration" else Task.COMPANIONSHIP
     try:
-        response = openai_client.chat_completion(
+        response = get_ai_gateway().chat(
+            db,
+            user_id=current_user.id,
+            task=task,
             messages=messages,
-            model=model,
+            scene="ai_chat",
             temperature=0.7,
-            max_retries=3,
-            fallback_model=fallback_model,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -365,12 +365,7 @@ def send_message(
     )
     db.add(ai_message)
     
-    # 更新Token使用
-    token_usage.tokens_used += response["tokens_used"]
-    
-    # 更新全局预算
-    _update_global_budget(db, response["tokens_used"], response["model"])
-    
+    # Token 用量与全局预算已由模型抽象层（gateway → metering，BR-209）记录，此处不再重复计量
     db.commit()
     
     # 对话结束后，异步更新长期记忆（滚动摘要）
@@ -638,14 +633,17 @@ def complete_registration(
         return {}
     
     try:
-        response = openai_client.chat_completion(
+        response = get_ai_gateway().chat(
+            db,
+            user_id=current_user.id,
+            task=Task.MEMORY_EXTRACTION,  # 结构化抽取
             messages=[
                 {"role": "system", "content": "你是一个专业的信息提取助手，从对话中提取结构化数据。请只返回JSON格式，不要其他文字。"},
                 {"role": "user", "content": extraction_prompt}
             ],
-            model=openai_client.model_gpt4o_mini,  # 使用GPT-4o-mini，成本低且性能好
+            scene="registration_extract",
             temperature=0.3,  # 降低温度，确保输出稳定
-            fallback_model=openai_client.model_gpt35,  # 如果GPT-4o-mini不可用，降级到GPT-3.5
+            count_user_quota=False,  # 注册期系统抽取，不占用户配额
         )
         
         # 解析JSON（支持多种格式）
