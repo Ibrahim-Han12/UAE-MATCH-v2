@@ -81,7 +81,7 @@
 | `app/schemas/` | Pydantic 请求/响应模型 |
 | `app/db/` | 数据库引擎、会话、Base |
 
-> 各接口与算法细节见 [LLD](04-LLD-详细设计文档.md)。
+> 各接口与算法细节见 [LLD](LLD-详细设计文档.md)。
 
 ---
 
