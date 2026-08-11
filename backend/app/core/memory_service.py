@@ -4,6 +4,12 @@
 """
 from typing import Optional
 from sqlalchemy.orm import Session
+# ============================================================
+# ⚠️ 已废弃（2026-08-12，BR-202）：滚动摘要方案被三层记忆取代。
+# 读路径 → app/core/memory/reader.py；写路径 → app/core/memory/extractor.py。
+# 所有活跃调用点已切换；本模块与 user_ai_memory / ai_memory_summary 表
+# 保留一个版本周期后删除。禁止新增对本模块的引用。
+# ============================================================
 from app.core.openai_client import get_openai_client
 from app.core.ai import get_ai_gateway, Task
 from app.models.user_ai_memory import UserAIMemory

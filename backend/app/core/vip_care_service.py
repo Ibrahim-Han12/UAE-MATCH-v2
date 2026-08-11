@@ -9,7 +9,7 @@ from sqlalchemy import and_, or_
 
 from app.core.openai_client import get_openai_client
 from app.core.ai import get_ai_gateway, Task
-from app.core.memory_service import get_memory_service
+from app.core.memory import reader as memory_reader
 from app.models.user import User
 from app.models.profile import UserProfile
 from app.models.order import Subscription
@@ -23,7 +23,6 @@ class VIPCareService:
     
     def __init__(self):
         self.openai_client = get_openai_client()
-        self.memory_service = get_memory_service()
     
     def get_vip_users(self, db: Session) -> List[User]:
         """获取所有活跃的VIP用户"""
@@ -173,8 +172,8 @@ class VIPCareService:
         
         user_name = profile.display_name if profile else "朋友"
         
-        # 获取长期记忆
-        memory_summary = self.memory_service.get_memory(db, user_id)
+        # 长期记忆：三层记忆的结构化画像摘要（取代旧滚动摘要）
+        memory_summary = memory_reader.build_profile_summary(db, user_id)
         
         # 获取最近状态
         activity = self.check_user_activity(db, user_id)

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, JSON
 from sqlalchemy.sql import func
 
 from app.db.session import Base
@@ -32,6 +32,16 @@ class MatchPreference(Base):
     mbti = Column(String(10), nullable=True)                   # MBTI 类型，比如 INTJ
 
     notes = Column(String(500), nullable=True)                 # 其他备注（例如必须喜欢猫等）
+
+    # ===== 深访 Schema v0.3.1 · C 类择偶条件扩展 =====
+    # C1/C2 复用上方 min/max_age、min/max_height_cm
+    education_floor = Column(String(20), nullable=True)         # C3.education_floor（none/bachelor/master）
+    income_floor_band = Column(String(20), nullable=True)       # C3.income_floor_band（枚举档位）
+    same_emirate_only = Column(Boolean, nullable=True)          # C4（对方暂在国内容忍度以 B6 为唯一事实源）
+    dealbreakers = Column(JSON, nullable=True)                  # C5 [{code, elasticity_value, note}]（per-item 弹性）
+
+    # C1-C4 的弹性系数（PRD 5.2：hard/negotiable/preference），如 {"C1":"hard","C3":"negotiable"}
+    elasticity = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

@@ -36,7 +36,7 @@ from app.schemas.ai_chat import (
 from app.core.openai_client import get_openai_client
 from app.core.ai import get_ai_gateway, Task
 from app.core.config import settings
-from app.core.memory_service import get_memory_service
+# 旧滚动摘要 memory_service 已废弃（BR-202 三层记忆取代，见 app/core/memory/）
 from app.core.embedding_service import get_embedding_service
 
 router = APIRouter(prefix="/ai-chat", tags=["ai-chat"])
@@ -296,9 +296,18 @@ def send_message(
         limit=50 if is_vip else 10,
     )
     
-    # 获取滚动摘要（长期记忆）- 所有用户都使用，不只是VIP
-    memory_service = get_memory_service()
-    memory_summary = memory_service.get_memory(db, current_user.id)
+    # 长期记忆注入（BR-202 三层记忆）：结构化画像摘要 + 向量检索 top-3 相关记忆
+    # （取代旧滚动摘要，CLAUDE §3 记忆架构 / §4 top-3 成本纪律）
+    from app.core.memory import reader as memory_reader
+    memory_summary = memory_reader.build_profile_summary(db, current_user.id)
+    try:
+        memories = memory_reader.retrieve_memories(db, current_user.id, request.message, top_k=3)
+        if memories:
+            memory_summary += "\n=== 相关记忆 ===\n" + "\n".join(
+                f"- {m['text']}" for m in memories if m.get("text")
+            )
+    except Exception:
+        pass  # 向量检索失败不阻塞对话
     
     # 获取用户风格偏好（从profile的extended_info中）
     user_style_preference = None
@@ -368,14 +377,18 @@ def send_message(
     # Token 用量与全局预算已由模型抽象层（gateway → metering，BR-209）记录，此处不再重复计量
     db.commit()
     
-    # 对话结束后，异步更新长期记忆（滚动摘要）
-    # 注意：这里可以改为后台任务，避免阻塞响应
-    try:
-        memory_service.update_memory_after_conversation(db, current_user.id, limit=10)
-        db.commit()
-    except Exception as e:
-        # 记忆更新失败不影响主流程
-        print(f"[WARNING] 更新长期记忆失败: {e}")
+    # 对话增量修正（PRD 5.4）：从本轮对话提取与画像冲突/新增的信息 → 待确认队列
+    # （深访期外的画像变更一律先入队，小缘口头确认后才落库；短消息跳过省成本）
+    if len(request.message) > 20:
+        try:
+            from app.core.memory import extractor as memory_extractor
+            exchange = f"用户: {request.message}\n小缘: {response['content']}"
+            extracted = memory_extractor.extract_from_conversation(db, current_user.id, exchange)
+            if extracted:
+                memory_extractor.apply_extracted(db, current_user.id, extracted, mode="incremental")
+            db.commit()
+        except Exception as e:
+            print(f"[WARNING] 增量记忆提取失败（不影响主流程）: {e}")
     
     return AIChatResponse(
         content=response["content"],

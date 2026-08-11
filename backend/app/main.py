@@ -25,6 +25,7 @@ from app.api.v1.endpoints.match_recommendation import router as match_recommenda
 from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.verification import router as verification_router
 from app.api.v1.endpoints.account import router as account_router
+from app.api.v1.endpoints.interview import router as interview_router
 
 
 
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router, prefix=settings.API_V1_STR)
     app.include_router(verification_router, prefix=settings.API_V1_STR)
     app.include_router(account_router, prefix=settings.API_V1_STR)
+    app.include_router(interview_router, prefix=settings.API_V1_STR)
 
     # 启动定时任务调度器（用于清理缓存等）
     try:

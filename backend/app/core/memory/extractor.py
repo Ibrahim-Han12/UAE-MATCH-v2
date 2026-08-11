@@ -143,24 +143,53 @@ def extract_from_conversation(
     return validated
 
 
-def apply_extracted(db: Session, user_id: int, extracted: Dict[str, Any]) -> Dict[str, List[str]]:
+def apply_extracted(
+    db: Session, user_id: int, extracted: Dict[str, Any],
+    mode: str = "interview",
+) -> Dict[str, List[str]]:
     """
-    抽取结果路由落库。返回 {routed_to: [field_ids]} 的落库报告。
-    不 commit，由调用方提交。
+    抽取结果路由落库。返回 {routed_to: [field_ids]} 的落库报告。不 commit。
+
+    mode="interview"：深访初采——A/B/C/D 直接落库（field_mapping 路由）。
+    mode="incremental"：日常对话增量修正（PRD 5.4）——Schema 字段的冲突/新增
+      一律进 memory_pending_changes 待小缘口头确认，不直接改画像；
+      G 类元数据与 F3 叙事仍直写（系统侧观察，非用户申明的事实变更）。
     """
     if not extracted:
         return {}
+    import json as _json
+    from app.core.interview import field_mapping
+    from app.core.memory import pending as pending_service
+
     confidence: Dict[str, str] = extracted.get("_confidence", {})
-    report: Dict[str, List[str]] = {"psych": [], "comm": [], "vector": [], "parked": []}
+    report: Dict[str, List[str]] = {"psych": [], "comm": [], "vector": [], "facts": [], "pending": []}
 
     psych_values: Dict[str, Any] = {}
     psych_conf: Dict[str, str] = {}
     comm_values: Dict[str, Any] = {}
-    parked: Dict[str, Any] = {}
+    audit_fields: Dict[str, Any] = {}
 
     for fid, value in extracted.items():
         if fid == "_confidence":
             continue
+        if fid in ("G1", "G2", "G3"):
+            key = {"G1": "avoid_topics", "G2": "excite_topics", "G3": "answer_style"}[fid]
+            comm_values[key] = value
+            report["comm"].append(fid)
+            continue
+        if fid == "F3" and isinstance(value, str) and value.strip():
+            writer.add_vector(db, user_id, "narrative", value.strip(), scene="narrative_vectorize")
+            report["vector"].append(fid)
+            continue
+
+        if mode == "incremental":
+            # 增量修正：入待确认队列（值序列化保存），确认后由调用方走 field_mapping 落库
+            serialized = value if isinstance(value, str) else _json.dumps(value, ensure_ascii=False)
+            pending_service.enqueue_change(db, user_id, fid, None, serialized, source="conversation")
+            report["pending"].append(fid)
+            continue
+
+        # interview 直写
         if fid in PSYCH_ROUTING:
             _, column = PSYCH_ROUTING[fid]
             psych_values[column] = value
@@ -172,25 +201,20 @@ def apply_extracted(db: Session, user_id: int, extracted: Dict[str, Any]) -> Dic
                     psych_values[col] = value[k]
             psych_conf["big_five"] = confidence.get(fid, "inferred")
             report["psych"].append(fid)
-        elif fid in ("G1", "G2", "G3"):
-            key = {"G1": "avoid_topics", "G2": "excite_topics", "G3": "answer_style"}[fid]
-            comm_values[key] = value
-            report["comm"].append(fid)
-        elif fid == "F3" and isinstance(value, str) and value.strip():
-            writer.add_vector(db, user_id, "narrative", value.strip(), scene="narrative_vectorize")
-            report["vector"].append(fid)
-        else:
-            parked[fid] = value  # A/B/C 类：等 ③/④ 表扩展后由资料模块消费
-            report["parked"].append(fid)
+        elif field_mapping.apply_field(db, user_id, fid, value):
+            audit_fields[fid] = value
+            report["facts"].append(fid)
 
     if psych_values:
         writer.upsert_psych_profile(db, user_id, psych_values, confidence=psych_conf)
     if comm_values:
         writer.upsert_comm_profile(db, user_id, comm_values)
-    if parked:
+    if audit_fields:
+        # 审计留痕：深访抽取写入了哪些事实字段（决策回溯素材）
         writer.append_event(
             db, user_id, "interview_extract",
-            payload={"fields": parked, "confidence": {k: confidence.get(k, "inferred") for k in parked}},
+            payload={"fields": list(audit_fields.keys()),
+                     "confidence": {k: confidence.get(k, "inferred") for k in audit_fields}},
             source="conversation",
         )
     return report
