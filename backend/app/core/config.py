@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     # KYC 服务商（B1 未定：Uqudo/IDWise 类；先 mock，生产接 SDK 后改此值）
     KYC_PROVIDER: str = "mock"
 
+    # 支付通道（B5 主体 + Stripe 账号就位后改 "stripe" 并配置密钥）
+    PAYMENT_PROVIDER: str = "mock"
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+
     # OpenAI配置
     OPENAI_API_KEY: str = ""  # OpenAI API Key（从环境变量读取）
     OPENAI_MODEL_GPT4O_MINI: str = "gpt-4o-mini"  # 主要模型：成本低、速度快、性能好

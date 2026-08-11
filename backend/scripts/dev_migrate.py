@@ -41,6 +41,10 @@ ALTERS = [
     # ⑤ 推荐流水线
     "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS marital_history VARCHAR(20)",
     "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sketch_confirmed_at TIMESTAMPTZ",
+    # ⑥ Stripe 订阅
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(64)",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS stripe_subscription_id VARCHAR(64)",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS grace_until TIMESTAMPTZ",
 ]
 
 

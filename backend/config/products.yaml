@@ -1,0 +1,56 @@
+# =============================================================
+# UAE Match · 订阅商品目录（BR-501/503 / PRD 8.1 / A1 裁决）
+# M2 实卖：标准档(月/季) + 早鸟券 + 尊享试卖 5 席(人工交付)；
+# 高级档 M3 开卖——挂"即将开放"不收钱（purchasable: false）。
+# 道具(super_like/boost/who_liked_me)冻结：不在本目录，旧接口返 410。
+# 货币仅 AED。价格变更改本文件并升版，代码零硬编码。
+# =============================================================
+meta:
+  version: 1.0.0
+  currency: AED
+
+skus:
+  standard_monthly:
+    name: 标准会员·月付
+    tier: standard
+    price: 149
+    interval: month
+    interval_count: 1
+    purchasable: true
+  standard_quarterly:
+    name: 标准会员·季付
+    tier: standard
+    price: 399
+    interval: month
+    interval_count: 3
+    purchasable: true
+  premium_monthly:
+    name: 高级会员·月付
+    tier: premium
+    price: 199
+    interval: month
+    interval_count: 1
+    purchasable: false          # A1：M3 开卖，会员中心挂"即将开放"
+    coming_soon: true
+  premium_quarterly:
+    name: 高级会员·季付
+    tier: premium
+    price: 549
+    interval: month
+    interval_count: 3
+    purchasable: false
+    coming_soon: true
+  elite_monthly:
+    name: 尊享 1v1·月付
+    tier: elite
+    price: 799
+    interval: month
+    interval_count: 1
+    purchasable: true
+    seat_cap: 5                 # A1：试卖 5 席（人工交付）；席位余量必须真实展示
+
+coupons:
+  EARLYBIRD99:                  # 早鸟：99 AED × 3 个月锁定价（Stripe 优惠券实现）
+    applies_to: standard_monthly
+    price_override: 99
+    duration_months: 3

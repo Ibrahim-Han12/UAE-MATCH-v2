@@ -83,8 +83,22 @@ def create_order(
 ) -> Any:
     """
     创建订单
+    【已冻结】道具变现冻结（BR-503）：super_like/boost/who_liked_me 返回 410；
+    旧人民币订阅 SKU 一并下线，订阅走 /subscription/*（AED，⑥）。
+    表与历史订单保留，本端点仅冻结新购。
     """
-    # 验证产品ID
+    frozen_props = ("super_like", "boost", "who_liked_me")
+    if order_data.product_id in frozen_props:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="该功能与稀缺推荐制互斥，已停止售卖（BR-503）",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="人民币商品目录已下线，请使用 /api/v1/subscription 的 AED 订阅",
+    )
+
+    # ===== 以下为冻结前的原实现，保留备查（BR-503：代码保留、入口下线）=====
     if order_data.product_id not in PRODUCTS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="无效的产品ID"
