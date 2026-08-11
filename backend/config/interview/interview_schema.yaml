@@ -1,0 +1,514 @@
+# =============================================================
+# UAE Match · 深访信息目标 Schema
+# 版本: v0.2.0 | 日期: 2026-08-11 | 权威依据: PRD v1.1 §5.2
+# v0.2 变更: C5 改 per-item 弹性; C4 移除 accept_remote_china(由 B6 派生); A7 口径对齐问法库
+# 用途: 深访编排器的验收标准(逐轮对账字段缺口)、抽取模块的落库契约、
+#       画像库建表依据、完成度计算(仅计 A-D 类)
+# 铁律: 本文件为唯一字段清单来源,禁止将字段清单写入系统 prompt(PRD 5.3.5)
+# =============================================================
+
+meta:
+  version: 0.2.0
+  authority: "PRD v1.1 §5.2"
+  governance:
+    must_field_cap: 25            # 必采字段硬上限;新增必采须同时移除或降级一项
+    admission_test: "字段是否会改变推荐结果?否则不得列为必采"
+    completion_scope: [A, B, C, D] # 完成度判定仅计 A-D 类
+    change_policy: "字段增删走本文件版本变更;存量用户缺口由画像更新机制(PRD 5.4)对话中自然补采,禁止回访式打扰"
+  stats:
+    must_total: 24                 # 其中 3 项系统带入(A1/A2/A3),用户实际回答约 21 项
+    should_total: 8
+    optional_total: 4
+
+# 通用字段属性说明:
+#   required_level: must(必采) | should(尽量采) | optional(可选) | system(系统元数据)
+#   source: eid(核验带入,锁定) | declaration(申报带入) | interview(访谈采集) | derived(系统推断)
+#   sensitivity: low | medium | high  → 决定问法库策略(high 必须用迂回/场景化问法)
+#   elasticity: true 表示该字段附带弹性系数子字段 {hard|negotiable|preference}
+#   confidence: 所有 interview 来源字段自动附带置信度 {stated|inferred};
+#               inferred 项由小缘后续对话自然确认(Schema G5)
+
+fields:
+
+  # ============ A. 硬性信息(9 项,必采;A1/A2/A3 系统带入) ============
+  - id: A1
+    key: birth_date
+    label_zh: 出生日期/年龄
+    category: A
+    required_level: must
+    source: eid
+    locked: true                   # EID 核验值带入后锁定,资料页不可编辑
+    type: date
+    sensitivity: low
+    notes: "年龄由此派生;18+ 硬门槛在核验环节执行(PRD 14.2)"
+
+  - id: A2
+    key: gender
+    label_zh: 性别
+    category: A
+    required_level: must
+    source: eid
+    locked: true
+    type: enum
+    enum: [male, female]
+    sensitivity: low
+
+  - id: A3
+    key: marital_history
+    label_zh: 婚史
+    category: A
+    required_level: must
+    source: declaration            # BR-109 申报环节带入,访谈仅补充语境
+    type: enum
+    enum: [never_married, divorced, widowed]
+    sensitivity: high
+    notes: "访谈中不重复核问事实,只在自然语境下补充叙事(如离异后的心态),叙事入 F3 向量记忆"
+
+  - id: A4
+    key: height_cm
+    label_zh: 身高
+    category: A
+    required_level: must
+    source: interview
+    type: integer
+    unit: cm
+    sensitivity: low
+
+  - id: A5
+    key: education
+    label_zh: 学历
+    category: A
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      level: {type: enum, enum: [high_school, college, bachelor, master, phd]}
+      institution: {type: string, required: false}   # 院校可选
+    sensitivity: low
+
+  - id: A6
+    key: occupation
+    label_zh: 职业
+    category: A
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      industry: {type: enum, enum: [engineering_construction, energy, telecom_it, finance, trade_commerce, government_project, education, healthcare, fnb_hospitality, logistics, media_design, entrepreneur, other]}
+      role_type: {type: enum, enum: [employee, manager, executive, business_owner, freelancer]}
+    sensitivity: low
+
+  - id: A7
+    key: income_band_aed
+    label_zh: 月收入区间(AED)
+    category: A
+    required_level: must
+    source: interview
+    type: enum
+    enum: [below_10k, 10k_20k, 20k_35k, 35k_50k, above_50k]
+    sensitivity: high
+    display_policy: never_shown_raw   # 仅参与匹配计算;推荐信中区间化且双向对等展示(PRD 6.2)
+    notes: "问法禁用直问数字,走生活方式支撑度迂回(问法库 A7)"
+
+  - id: A8
+    key: residence_area
+    label_zh: 居住区域
+    category: A
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      emirate: {type: enum, enum: [dubai, abu_dhabi, sharjah, ajman, rak, fujairah, uaq]}
+      district: {type: string}      # 片区自由文本,归一化由抽取器处理
+    sensitivity: medium
+
+  - id: A9
+    key: visa_type
+    label_zh: 签证/身份类型
+    category: A
+    required_level: must
+    source: interview
+    type: enum
+    enum: [employer_sponsored, golden_visa, self_sponsored_business, dependent, student, other]
+    sensitivity: high
+    display_policy: never_shown_raw   # 敏感字段,仅参与计算,任何界面不向对方展示(PRD 14.2)
+
+  # ============ B. 本地化维度(6 项,必采,核心数据资产) ============
+  - id: B1
+    key: relocation_plan
+    label_zh: UAE 去留规划
+    category: B
+    required_level: must
+    source: interview
+    type: enum
+    enum: [long_term_stay, return_within_years, depends_on_marriage, undecided]
+    extra:
+      return_horizon_years: {type: integer, when: return_within_years}
+    sensitivity: medium
+    matching_weight: hard_constraint   # 硬约束级权重(BR-306):去留冲突直接降权
+    recalc_trigger: true               # 变更触发匹配池重算(PRD 5.4-①)
+
+  - id: B2
+    key: marriage_timeline
+    label_zh: 结婚时间线
+    category: B
+    required_level: must
+    source: interview
+    type: enum
+    enum: [within_1y, 1_2y, 2_3y, no_rush]
+    sensitivity: medium
+    matching_rule: "时间线差距 >2 档提示预期错位(BRD 3.3)"
+    recalc_trigger: true
+
+  - id: B3
+    key: children_plan
+    label_zh: 子女计划
+    category: B
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      want_children: {type: enum, enum: [yes, no, open_to_discuss]}
+      timeline: {type: enum, enum: [within_2y, 2_5y, someday, na], required: false}
+      accept_partner_with_children: {type: enum, enum: [yes, no, depends]}   # PRD 5.2 明确必含
+    sensitivity: high
+    recalc_trigger: true
+
+  - id: B4
+    key: parents_care_plan
+    label_zh: 父母养老安排
+    category: B
+    required_level: must
+    source: interview
+    type: enum
+    enum: [bring_to_uae, return_to_care, institutional_care, undecided]
+    sensitivity: high
+    notes: "价值观深水区,场景化问法(问法库 B4);华人婚恋咨询高频冲突源"
+
+  - id: B5
+    key: cross_cultural_openness
+    label_zh: 跨文化开放度
+    category: B
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      open: {type: enum, enum: [chinese_only, open_with_conditions, fully_open]}
+      nationality_scope: {type: array, items: string, required: false}
+      religion_constraint: {type: enum, enum: [none, non_muslim_only, same_faith_only, other], required: false}
+      language_requirement: {type: enum, enum: [mandarin_required, english_ok, any], required: false}
+    sensitivity: high
+    matching_weight: none_v1        # v1 仅采集不参与匹配;Phase 2 启用(BRD 2.5)
+    recalc_trigger: phase2_only
+
+  - id: B6
+    key: distance_tolerance
+    label_zh: 异地容忍度
+    category: B
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      cross_emirate: {type: enum, enum: [yes, no, short_term_ok]}      # 迪拜↔阿布扎比场景
+      partner_in_china_temp: {type: enum, enum: [yes, no, depends]}    # 对方暂在国内
+    sensitivity: low
+    matching_weight: hard_constraint
+    notes: "partner_in_china_temp 为“接受对方暂在国内”这一事实的唯一来源;C4 地域要求与匹配引擎均引用本字段,不得另存副本"
+
+  # ============ C. 择偶条件(5 项,必采,每项带弹性系数) ============
+  # 弹性系数 elasticity_value: hard(不可动) | negotiable(可商量) | preference(仅偏好)
+  - id: C1
+    key: partner_age_range
+    label_zh: 对方年龄范围
+    category: C
+    required_level: must
+    source: interview
+    type: object
+    schema: {min: integer, max: integer}
+    elasticity: true
+    sensitivity: low
+    recalc_trigger: true            # 弹性收紧(negotiable→hard)等效新增硬约束(PRD 5.4-⑧)
+
+  - id: C2
+    key: partner_height_req
+    label_zh: 对方身高要求
+    category: C
+    required_level: must
+    source: interview
+    type: object
+    schema: {min_cm: integer, max_cm: {type: integer, required: false}}
+    elasticity: true
+    sensitivity: low
+    recalc_trigger: true
+
+  - id: C3
+    key: partner_edu_income_floor
+    label_zh: 对方学历/收入门槛
+    category: C
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      education_floor: {type: enum, enum: [none, bachelor, master], required: false}
+      income_floor_band: {type: enum, enum: [none, 10k_20k, 20k_35k, above_35k], required: false}
+    elasticity: true
+    sensitivity: medium
+    recalc_trigger: true
+
+  - id: C4
+    key: partner_location_req
+    label_zh: 对方地域要求
+    category: C
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      same_emirate_only: {type: boolean}
+      # accept_remote_china 已移除:该事实的单一来源为 B6.partner_in_china_temp,
+      # 匹配引擎直接引用 B6,避免同一事实双写(v0.2 裁决)
+    elasticity: true
+    sensitivity: low
+    recalc_trigger: true
+
+  - id: C5
+    key: dealbreakers
+    label_zh: 免谈项清单
+    category: C
+    required_level: must
+    source: interview
+    type: array
+    items:
+      code: {type: enum, enum: [smoking, heavy_drinking, divorced, has_children, gambling, long_distance, pets_conflict, other]}
+      elasticity_value: {type: enum, enum: [hard, negotiable]}   # per-item 弹性:问法库 C5 probe 逐项确认后落此
+      note: {type: string, required: false}   # 自由表述保留原文,抽取器归类
+    elasticity: per_item             # C 类"每项带弹性系数"(PRD 5.2)在本字段落为条目级
+    sensitivity: medium
+    recalc_trigger: true
+    notes: "人工红娘方法论第一杀手锏:先排雷再谈匹配;自由表述后结构化归类"
+
+  # ============ D. 价值观与关系模式(4 项,必采,情境题行为编码,不发量表) ============
+  - id: D1
+    key: attachment_tendency
+    label_zh: 依恋倾向
+    category: D
+    required_level: must
+    source: interview
+    type: enum
+    enum: [secure, anxious, avoidant, mixed_unclear]
+    collection_method: scenario_coding    # 情境题+行为编码,禁用量表(PRD 5.2)
+    sensitivity: high
+    matching_rule: "anxious × avoidant 组合强降权(BR-306/5.3.6)"
+    confidence_required: true
+
+  - id: D2
+    key: conflict_style
+    label_zh: 冲突处理风格
+    category: D
+    required_level: must
+    source: interview
+    type: enum
+    enum: [collaborative, accommodating, avoidant_withdraw, competitive, unclear]
+    collection_method: scenario_coding
+    sensitivity: high
+    notes: "编码依据 Gottman 冲突模式体系;回避-退缩(stonewalling 倾向)为关键识别项"
+    confidence_required: true
+
+  - id: D3
+    key: family_role_expectation
+    label_zh: 家庭角色期待
+    category: D
+    required_level: must
+    source: interview
+    type: object
+    schema:
+      finance_model: {type: enum, enum: [joint_pool, proportional, independent, flexible]}
+      career_priority: {type: enum, enum: [both_career, one_flexible, family_first, undecided]}
+      housework_expectation: {type: enum, enum: [equal_split, outsource, traditional_split, flexible]}
+    collection_method: scenario_coding
+    sensitivity: high
+
+  - id: D4
+    key: money_attitude
+    label_zh: 金钱观
+    category: D
+    required_level: must
+    source: interview
+    type: enum
+    enum: [saver, balanced, spender_experience, investor_risk_taker]
+    collection_method: scenario_coding
+    sensitivity: medium
+
+  # ============ E. 尽量采(8 项,不阻塞完成度) ============
+  - id: E1
+    key: big_five
+    label_zh: 大五五维评分
+    category: E
+    required_level: should
+    source: derived                  # 由访谈全程行为编码累积,允许跨会话摊销(PRD 5.2 治理④)
+    type: object
+    schema: {openness: float, conscientiousness: float, extraversion: float, agreeableness: float, neuroticism: float}
+    sensitivity: high
+    matching_rule: "双高 neuroticism 降权(BR-306)"
+
+  - id: E2
+    key: mbti_self_report
+    label_zh: MBTI(自报)
+    category: E
+    required_level: should
+    source: interview
+    type: string
+    pattern: "^[EI][NS][TF][JP]$"
+    sensitivity: low
+    notes: "仅作沟通语言;映射为大五入库,匹配对内用大五计算(5.3.6 分层原则)"
+
+  - id: E3
+    key: daily_rhythm
+    label_zh: 作息类型
+    category: E
+    required_level: should
+    source: interview
+    type: enum
+    enum: [early_bird, night_owl, flexible]
+    sensitivity: low
+
+  - id: E4
+    key: diet_habit
+    label_zh: 饮食习惯
+    category: E
+    required_level: should
+    source: interview
+    type: object
+    schema:
+      cuisine_preference: {type: array, items: string}
+      halal_environment_adapted: {type: enum, enum: [fully, partially, struggling]}
+    sensitivity: low
+
+  - id: E5
+    key: smoking_drinking
+    label_zh: 烟酒
+    category: E
+    required_level: should
+    source: interview
+    type: object
+    schema:
+      smoking: {type: enum, enum: [never, socially, regularly]}
+      drinking: {type: enum, enum: [never, socially, regularly]}
+    sensitivity: low
+
+  - id: E6
+    key: religion
+    label_zh: 宗教信仰及实践程度
+    category: E
+    required_level: should
+    source: interview
+    type: object
+    schema:
+      faith: {type: enum, enum: [none, buddhist, christian, muslim, other]}
+      practice_level: {type: enum, enum: [cultural_only, occasional, devout], required: false}
+    sensitivity: high
+
+  - id: E7
+    key: social_radius
+    label_zh: 社交半径
+    category: E
+    required_level: should
+    source: interview
+    type: enum
+    enum: [homebody, small_circle, active_social]
+    sensitivity: low
+
+  - id: E8
+    key: interest_tags
+    label_zh: 兴趣标签
+    category: E
+    required_level: should
+    source: interview
+    type: array
+    items: string
+    max_items: 5
+    sensitivity: low
+
+  # ============ F. 可选(4 项) ============
+  - id: F1
+    key: zodiac_sign
+    label_zh: 星座
+    category: F
+    required_level: optional
+    source: interview
+    type: string
+    sensitivity: low
+    matching_weight: zero            # 权重为零,禁止否定性表述(5.3.6 铁律)
+
+  - id: F2
+    key: chinese_zodiac
+    label_zh: 属相
+    category: F
+    required_level: optional
+    source: derived                  # 可由出生日期派生;用户主动提及时记录其在意程度
+    type: object
+    schema:
+      sign: string
+      user_cares: {type: boolean}
+      parents_care: {type: boolean}  # 父母辈在意属相的华人语境(5.3.6)
+    sensitivity: low
+    matching_weight: zero
+
+  - id: F3
+    key: relationship_narrative
+    label_zh: 感情经历叙事
+    category: F
+    required_level: optional
+    source: interview
+    type: vector_only                # 仅入向量记忆库,不进结构化字段(PRD 5.2)
+    sensitivity: high
+
+  - id: F4
+    key: ideal_weekend
+    label_zh: 理想周末描述
+    category: F
+    required_level: optional
+    source: interview
+    type: string
+    sensitivity: low
+    notes: "破冰素材;推荐语生成的高频引用源"
+
+  # ============ G. 系统元数据(自动生成,不问用户,不占提问预算) ============
+  - id: G1
+    key: avoided_topics
+    label_zh: 回避话题清单
+    category: G
+    required_level: system
+    source: derived
+    type: array
+    notes: "回避本身即画像信息(PRD 6.3.1);同时供问法库敏感策略消费"
+  - id: G2
+    key: engaged_topics
+    label_zh: 兴奋话题清单
+    category: G
+    required_level: system
+    source: derived
+    type: array
+  - id: G3
+    key: response_style
+    label_zh: 回答风格特征
+    category: G
+    required_level: system
+    source: derived
+    type: object
+    schema: {verbosity: enum, emotional_openness: enum, humor_style: string}
+  - id: G4
+    key: interview_completion
+    label_zh: 访谈完成度
+    category: G
+    required_level: system
+    source: derived
+    type: float
+    notes: "仅计 A-D 类;前端表述为\u201c了解你 X%\u201d,禁用\u201c完成度/填写进度\u201d表单语言(PRD 5.1)"
+  - id: G5
+    key: field_confidence
+    label_zh: 字段置信度映射
+    category: G
+    required_level: system
+    source: derived
+    type: object
+    notes: "stated=用户明说 / inferred=推断;inferred 项由小缘后续对话自然确认"

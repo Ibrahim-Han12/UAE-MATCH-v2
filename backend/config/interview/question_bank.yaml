@@ -1,0 +1,334 @@
+# =============================================================
+# UAE Match · 深访问法库
+# 版本: v0.2.0 | 日期: 2026-08-11 | 权威依据: PRD v1.1 §5.1/5.3.5(L2 层)
+# v0.2 变更: elasticity_check 正式化为 post_step; A7 话术对齐 5 档; C4 补第二问法;
+#           新增 E2/E6 条目; 复合 ID 改 fields 列表; C5 弹性确认结果落 Schema per-item 字段
+# 用途: 深访编排器按字段缺口取问法建议,动态注入当轮上下文;
+#       LLM 在人设约束下将问法改写为贴合当前对话语境的自然语言(禁止照读)
+# 性质: 核心业务资产 —— S2 人工红娘阶段验证有效的问法持续回填本文件
+# 铁律: 单轮单问;敏感字段(sensitivity: high)必须走 approach 而非直问;
+#       追问深度默认上限 1 层;疲劳信号出现时禁止追问(PRD 5.1)
+# =============================================================
+
+meta:
+  version: 0.2.0
+  usage: "编排器每轮注入: 目标字段的 approaches(按 context_hint 择一) + probe 规则;LLM 现场组织语言"
+  global_rules:
+    max_probe_depth: 1              # 追问最多 1 层,答案仍模糊则标记 inferred/缺失,不逼问
+    rewrite_required: true          # LLM 必须结合上下文改写,禁止逐字照读问法文本
+    fatigue_override: "疲劳信号触发时,当轮禁止发起新问题,转收尾话术"
+    give_before_ask: "每完成一个话题域,先给 mini-insight 再进入下一域(PRD 5.1)"
+    post_step: "字段带 post_step 键者,主问法采集到值后必须执行该追加确认(如弹性系数);post_step 不属于 approaches,不可被跳过,编排器作为强制后置步骤处理"
+
+question_bank:
+
+  # ---------------- A 类 · 硬性信息 ----------------
+  - field: A4    # 身高
+    approaches:
+      - style: casual_direct
+        text: "顺便记一下基础档案——身高多少?我帮你在匹配里把双方偏好都对上。"
+        context_hint: 基础信息集中采集段,直问无妨
+      - style: bundled
+        text: "把几个基础项一次说了吧:身高、学历,还有现在做什么工作?"
+        context_hint: 用户节奏快、偏好高效时,允许打包采集(唯一豁免单轮单问的场景)
+    probe: {trigger: none}
+
+  - field: A5    # 学历
+    approaches:
+      - style: narrative
+        text: "你是读完书直接过来的,还是工作几年后出来的?当时学的什么?"
+        context_hint: 借"来 UAE 的故事"顺采,同时带出 A6 线索
+      - style: casual_direct
+        text: "学历方面,最高读到什么?院校要是方便也可以说,有些用户会在意校友背景。"
+        context_hint: 基础信息段
+    probe: {trigger: "只答了层级未提院校", action: "不追问;院校为可选项"}
+
+  - field: A6    # 职业
+    approaches:
+      - style: narrative
+        text: "在这边做哪一行?日常工作状态是什么样的——是驻项目的那种忙法,还是坐办公室的忙法?"
+        context_hint: 首选;顺带产出作息(E3)与忙碌程度线索
+      - style: empathic
+        text: "听你说时间不太自由——是做工程项目这类的吗?"
+        context_hint: 用户已抱怨忙碌时顺势确认
+    probe: {trigger: "行业明确但角色不明", probe_text: "算是管理岗还是技术/业务岗?", max_depth: 1}
+
+  - field: A7    # 收入区间 【高敏】
+    sensitivity_strategy: "禁止直问数字;走生活方式支撑度或匹配必要性两条迂回;用户回避则记入 G1 并降级为 inferred 估计,绝不二次追问"
+    approaches:
+      - style: lifestyle_proxy
+        text: "不问具体数字——目前的收入水平,支撑你想要的生活方式宽裕吗?我按区间记就行,匹配时只看双方大致是否对等。"
+        context_hint: 首选;先声明用途与脱敏规则再问,降低戒备
+      - style: matching_rationale
+        text: "有些用户会对经济匹配度有要求,所以我需要一个大致区间——一万以下、一到两万、两到三万五、三万五到五万、五万以上,落在哪一档?"
+        context_hint: 用户偏好直接高效、或已主动谈及对方收入要求(C3)时
+    probe: {trigger: "回避或含糊", action: "立即放下:'没关系,这项跳过,不影响我们继续。' 记 G1 回避清单 + inferred 估计"}
+
+  - field: A8    # 居住区域
+    approaches:
+      - style: casual_direct
+        text: "你住在哪个区?约见面的时候我好参考双方的距离。"
+        context_hint: 任意时段;绑定"为你服务"的理由
+      - style: narrative
+        text: "在迪拜还是阿布扎比?住那边多久了,习惯吗?"
+        context_hint: 开场闲聊段顺采,同时铺垫 B1
+    probe: {trigger: "只答酋长国未答片区", probe_text: "具体哪一片?比如 Marina、JLT 这种。", max_depth: 1}
+
+  - field: A9    # 签证类型 【高敏】
+    sensitivity_strategy: "先解释为什么需要(去留稳定性判断),并明示'这项永远不会展示给对方';禁止用'你是什么身份'这类问法"
+    approaches:
+      - style: purpose_first
+        text: "问一个不会展示给任何人的字段:你现在是雇主签、黄金签证还是自雇?这只帮我判断你在这边的稳定性,和去留规划放在一起看。"
+        context_hint: 首选;紧跟 B1 去留话题之后最自然
+      - style: narrative
+        text: "你的签证是绑在公司身上的,还是自己独立的?——这关系到如果换工作,留下来这件事受不受影响。"
+        context_hint: 用户聊到工作变动/跳槽想法时顺采
+    probe: {trigger: none}
+
+  # ---------------- B 类 · 本地化维度(核心资产) ----------------
+  - field: B1    # 去留规划
+    approaches:
+      - style: contextual
+        text: "往后看,你是打算把根扎在这边,还是干几年就回去?或者——这事其实取决于遇到什么人?"
+        context_hint: 首选;第三个选项给了"视婚姻而定"的台阶,很多人第一次被问才意识到
+      - style: anchor_event
+        text: "你都在这边买房/续了长签了,看来是认真打算留下?"
+        context_hint: 用户提及购房、黄金签证、孩子教育等锚点事件时确认
+      - style: family_angle
+        text: "爸妈那边是希望你回去发展,还是能接受你在这边成家?"
+        context_hint: 用户聊到父母/催婚时切入;同时铺垫 B4
+    probe: {trigger: "答'没想好'", probe_text: "那有没有哪种情况会让你倾向留下来?比如事业、感情、身份?", max_depth: 1,
+            note: "追问后仍未定 → 记 undecided,这本身是有效画像值"}
+
+  - field: B2    # 结婚时间线
+    approaches:
+      - style: direct_serious
+        text: "认真问一句:如果遇到对的人,你希望多久之内把婚结了?一年内、一两年、两三年,还是顺其自然?"
+        context_hint: 首选;严肃产品可以严肃地问,用户来这里就是为了这个
+      - style: pressure_angle
+        text: "家里催得紧吗?你自己心里的时间表和他们的一致吗?"
+        context_hint: 用户提及催婚时切入;注意区分'父母的时间线'与'本人的时间线',以本人为准落库
+    probe: {trigger: "答'看缘分'类模糊值", probe_text: "如果非要说一个让你自己舒服的节奏呢?", max_depth: 1}
+
+  - field: B3    # 子女计划 【高敏】
+    sensitivity_strategy: "场景化切入,禁止'你要不要孩子'式表格问法;accept_partner_with_children 子项在用户婚史或年龄语境合适时才问,避免冒犯"
+    approaches:
+      - style: future_scene
+        text: "往后想五年——你理想的家庭画面里有小孩吗?有的话,是希望早点要,还是先过几年二人世界?"
+        context_hint: 首选;画面感提问比是非题打开度高
+      - style: practical
+        text: "在这边养孩子和回国养,你有倾向吗?——这个问题其实也在帮我确认你的去留想法。"
+        context_hint: B1 已聊过后的深化;同时交叉验证 B1
+      - style: partner_children
+        text: "如果对方条件都合适,但之前有过孩子——这对你是完全不行,还是看情况?"
+        context_hint: 仅在氛围成熟(已建立信任)或用户主动谈及婚史话题时问
+    probe: {trigger: "want=open_to_discuss", probe_text: "'看情况'——主要看什么?对方意愿,还是现实条件?", max_depth: 1}
+
+  - field: B4    # 父母养老 【高敏】
+    sensitivity_strategy: "从'和父母的关系'切入而非'养老安排'——后者对年轻用户显得沉重;孝道话题保持零评判"
+    approaches:
+      - style: relationship_first
+        text: "你和爸妈联系多吗?他们对你在国外这件事,现在是什么态度?"
+        context_hint: 首选铺垫;答案自然引出长期安排
+      - style: scenario
+        text: "有个很实际的问题,很多在这边成家的人都会遇到:等父母年纪大了,你的打算是接过来,还是到时候回去?"
+        context_hint: 铺垫之后的正式采集;'很多人都会遇到'降低针对感
+    probe: {trigger: "答'没想过'", action: "记 undecided + 轻收尾:'没关系,这题很多人都是遇到了才想。'不追问", max_depth: 0}
+
+  - field: B5    # 跨文化开放度 【高敏】
+    sensitivity_strategy: "零引导、零评判;明确告知 v1 只在华人池内匹配、此项为将来备用,消除'答开放会被推外国人'的顾虑"
+    approaches:
+      - style: neutral_survey
+        text: "一个备用问题,现阶段我们只在华人用户里为你匹配:你自己对跨文化的感情持什么态度?完全只考虑华人,还是有条件地开放——比如国籍、宗教、语言上有前提?"
+        context_hint: 首选;前置声明消除误解
+      - style: experience_based
+        text: "在这边这些年,有没有接触过让你觉得'其实也不是不行'的跨文化关系?你的边界在哪?"
+        context_hint: 用户社交活跃、主动聊到外国朋友时
+    probe: {trigger: "open_with_conditions", probe_text: "条件主要在哪一项——国籍、宗教还是语言?", max_depth: 1}
+
+  - field: B6    # 异地容忍度
+    approaches:
+      - style: concrete_scene
+        text: "很现实的一题:如果特别合适的人在另一个酋长国——比如你在阿布扎比、TA 在迪拜,一个半小时车程——这个距离你接受吗?"
+        context_hint: 首选;给具体场景而非抽象的'能否异地'
+      - style: china_variant
+        text: "再进一步:如果 TA 目前人还在国内、明确计划过来,这种'短期异地'呢?"
+        context_hint: 紧跟第一问;两个子项一次采齐
+    probe: {trigger: none}
+
+  # ---------------- C 类 · 择偶条件(每项采集弹性系数) ----------------
+  # 弹性采集通用规则: 每条硬性要求落库前必问弹性 —— "这条是完全不行,还是遇到特别合适的人可以商量?"
+  # 直接决定 elasticity_value: hard / negotiable / preference
+  - field: C1    # 对方年龄
+    approaches:
+      - style: open_first
+        text: "说说你希望对方是什么样的人吧——先从年龄说起,你舒服的区间是?"
+        context_hint: C 类采集的自然开场
+      - style: linked_values
+        text: "结合你刚才说的结婚时间线——你希望对方大概在什么年龄段,和你的节奏合得上?"
+        context_hint: B2 已采集后的备选切入
+    post_step:
+      text: "这个区间是硬线,还是说人特别合适的话,上下差一两岁也行?"
+      purpose: elasticity_confirm    # 落 C1.elasticity_value
+    probe: {trigger: "区间异常窄(≤3 岁)", probe_text: "区间挺精确的——有什么特别的考虑吗?", max_depth: 1,
+            note: "窄区间常有故事,答案入 F3 叙事"}
+
+  - field: C2    # 对方身高
+    approaches:
+      - style: casual
+        text: "身高上有要求吗?一个大概的底线就行。"
+        context_hint: C 类连续采集段
+      - style: humor_light
+        text: "外形条件里,身高对你来说排第几?有底线的话是多少?"
+        context_hint: 氛围轻松时的备选
+    post_step:
+      text: "这条是必须,还是加分项?"
+      purpose: elasticity_confirm    # 落 C2.elasticity_value
+    probe: {trigger: none}
+
+  - field: C3    # 学历/收入门槛
+    approaches:
+      - style: framing_first
+        text: "学历和经济条件,你是'有底线'型,还是'看整体感觉'型?如果有底线,大概在哪?"
+        context_hint: 首选;先分型降低物质化的尴尬感
+      - style: values_probe
+        text: "换个角度问:对方的学历和收入,对你来说更多是'能力的证明',还是'生活质量的保障'?有没有一条实际的底线?"
+        context_hint: 用户对直接谈条件显得不适时的迂回切入;答案顺带暴露其金钱观(D4)线索
+    post_step:
+      text: "如果一个人各方面都对,唯独这条差一点——比如学历本科但能力很强——你会考虑吗?"
+      purpose: elasticity_confirm    # 落 C3.elasticity_value;这条的弹性答案信息量极大
+    probe: {trigger: "答'随便/都行'", probe_text: "真的完全没有底线吗?我按'无门槛'记了,推荐范围会宽很多。", max_depth: 1,
+            note: "'都行'常是客气,用后果提示逼出真实底线"}
+
+  - field: C4    # 对方地域
+    approaches:
+      - style: linked
+        text: "结合刚才说的异地问题——对方必须和你同城,还是同在 UAE 就行?"
+        context_hint: 紧跟 B6 采集(注意:对方暂在国内的容忍度已由 B6 采集,此处不重复问)
+      - style: practical_scene
+        text: "从见面的实际角度想——你希望约会是“半小时内到”的距离,还是隔个酋长国也无所谓?"
+        context_hint: 独立采集时的场景化备选
+    post_step:
+      text: "同城这条是硬要求,还是人合适就无所谓?"
+      purpose: elasticity_confirm    # 落 C4.elasticity_value
+    probe: {trigger: none}
+
+  - field: C5    # 免谈项 【方法论核心】
+    approaches:
+      - style: dealbreaker_direct
+        text: "最后一个重要问题:有没有什么是'一票否决'的?抽烟、离过婚、有孩子、异地……任何你完全不能接受的,现在告诉我,我从源头帮你排掉。"
+        context_hint: 首选;C 类收尾时问,'从源头排掉'点明价值
+      - style: story_based
+        text: "之前的感情里,有没有什么是让你下决心'再也不要'的?"
+        context_hint: 用户聊过感情经历(F3)后切入;答案往往比清单式提问更真实
+    probe: {trigger: "每报一项", probe_text: "这条是绝对红线,还是极端情况下能商量?", max_depth: 1,
+            note: "用户口中的'免谈'约三成实为 negotiable,逐项确认后落 C5.items[].elasticity_value(Schema v0.2 per-item 弹性);确认后 hard 项不再挑战"}
+
+  # ---------------- D 类 · 价值观与关系模式(情境题 + 行为编码) ----------------
+  # 通用规则: 禁止量表;LLM 依 coding_rubric 对回答做行为编码,置信度默认 inferred,
+  #           多情境交叉验证后可升 stated;编码结果绝不告知用户"你被测了"(报告中以洞察形式呈现)
+  - field: D1    # 依恋倾向
+    approaches:
+      - style: scenario_message
+        text: "聊个场景:你发了消息,对方大半天没回——你通常会怎么想,会做什么?"
+        context_hint: 首选;经典依恋探针,放在聊天习惯话题中最自然
+      - style: scenario_past
+        text: "过去的感情里,你是更怕'离得太近失去自己',还是更怕'对方突然变淡'?"
+        context_hint: 用户谈及感情经历时;直击回避/焦虑两轴
+    coding_rubric:
+      secure: "会想对方在忙,该干嘛干嘛,晚点自然会回 → secure"
+      anxious: "反复查看、脑补负面原因、忍不住追发消息 → anxious"
+      avoidant: "无所谓,甚至觉得清净/'我也经常不回别人' → avoidant"
+      note: "单一情境不定论;与 D2 及日常回复行为交叉验证"
+    probe: {trigger: "答案笼统", probe_text: "上一次真的发生这种情况,你实际做了什么?", max_depth: 1,
+            note: "问'实际做了什么'而非'你会怎样'——行为比自我认知可信"}
+
+  - field: D2    # 冲突处理风格
+    approaches:
+      - style: scenario_conflict
+        text: "两个人意见不合、气氛僵住的时候,你是当场说开的那种,还是先冷一冷再谈?或者……干脆等它自己过去?"
+        context_hint: 首选;三个选项分别探 collaborative / 冷静型 / avoidant_withdraw
+      - style: past_conflict
+        text: "回想一次你处理得不太好的争执——如果重来,你会改哪里?"
+        context_hint: 信任建立后;'处理不好的'比'你通常怎样'更暴露真实模式
+    coding_rubric:
+      collaborative: "主动沟通、就事论事、寻找双方方案"
+      accommodating: "习惯性让步息事宁人"
+      avoidant_withdraw: "回避话题、冷处理到不了了之(Gottman stonewalling 信号,重点标记)"
+      competitive: "必须争出对错胜负"
+    probe: {trigger: "答'看情况'", probe_text: "那说一个最近的'情况'?", max_depth: 1}
+
+  - field: D3    # 家庭角色期待
+    approaches:
+      - style: scenario_money
+        text: "假设婚后:工资是放一起管、按比例出,还是各管各的、共同开销 AA?你倾向哪种?"
+        context_hint: finance_model 探针;具体方案比'你怎么看家庭财务'易答
+      - style: scenario_career
+        text: "如果有一天,两个人的事业只能全力保一个——比如一方的机会需要另一方搬家——你觉得该怎么定?"
+        context_hint: career_priority 探针;答案的'决策方式'比'保谁'更有编码价值
+      - style: scenario_housework
+        text: "过日子的琐碎——做饭打扫这些,你理想的分法是?"
+        context_hint: housework 探针;轻量,可在生活方式话题顺带
+    probe: {trigger: "三子项未采齐", action: "分散在不同会话补齐,单次会话最多问其中两项(防连环拷问感)"}
+
+  - field: D4    # 金钱观
+    approaches:
+      - style: scenario_windfall
+        text: "假设今年多了一笔 5 万迪拉姆的意外收入,你会怎么处理?"
+        context_hint: 首选;存/花/投的答案直接映射枚举
+      - style: lifestyle
+        text: "你是'该花花该省省'的类型,还是明确的储蓄派/体验派?"
+        context_hint: 消费话题(如聊到旅行、购物)顺带
+    coding_rubric:
+      saver: "大部分存起来/还贷"
+      balanced: "部分存部分花,有规划"
+      spender_experience: "旅行/体验/享受优先"
+      investor_risk_taker: "投资、加密资产、生意周转"
+    probe: {trigger: none}
+
+  # ---------------- E/F 类 · 轻量问法(尽量采/可选,顺带采集为主) ----------------
+  - field: E2    # MBTI(自报)
+    approaches:
+      - style: casual_meme
+        text: "现在很多人都爱聊这个——你测过 MBTI 吗?是哪个型?"
+        context_hint: 性格话题顺带;用户答了则映射大五入库,没测过就跳过,禁止引导去测
+      - style: passive
+        text: null
+        context_hint: 用户主动报型号(如“我是 INFJ”)时直接记录并回应,顺势聊性格话题采 D 类线索
+    probe: {trigger: none}
+
+  - field: E6    # 宗教 【高敏】
+    sensitivity_strategy: "禁止直问“你信教吗”;从生活实践侧切入;用户任何程度的回避立即放下并记 G1;答案仅用于匹配约束,永不展示"
+    approaches:
+      - style: lifestyle_side
+        text: "生活里有没有什么信仰层面的习惯或讲究?比如吃素日、礼拜、进庙上香这类——有的话我在匹配时会留意对方能不能尊重。"
+        context_hint: 首选;以“习惯”代“信仰”,以“对方尊重”点明用途
+      - style: partner_angle
+        text: "反过来问:如果对方有宗教信仰,你介意吗?介意到什么程度?"
+        context_hint: 用户自身无信仰信号时,采集其作为择偶约束的一侧;答案同时喂 B5.religion_constraint
+    probe: {trigger: "提及信仰但未提程度", probe_text: "算是文化习惯层面,还是比较认真的践行?", max_depth: 1}
+
+  - fields: [E3, E5, E7]   # 作息/烟酒/社交半径 打包
+    approaches:
+      - style: lifestyle_bundle
+        text: "日常状态大概是什么样?早睡早起还是夜猫子,平时抽烟喝酒吗,周末更愿意宅着还是出去?"
+        context_hint: 生活方式话题一次带过,禁止逐项盘问
+  - field: E4
+    approaches:
+      - style: local_angle
+        text: "吃的方面在这边习惯吗?想吃的中餐都找得到吗?"
+        context_hint: UAE 生活话题顺带;halal 适应度从回答推断
+  - field: E8
+    approaches:
+      - style: open
+        text: "工作之外,什么事情最能让你来劲?"
+  - field: F4
+    approaches:
+      - style: open
+        text: "描述一下你理想中的周末——如果完全由你安排。"
+        context_hint: 破冰素材采集;答案高频用于推荐语引用
+  - fields: [F1, F2]
+    approaches:
+      - style: passive_only
+        text: null
+        context_hint: "禁止主动问星座属相;用户主动提及时记录并顺势确认在意程度(本人在意?父母在意?)"
