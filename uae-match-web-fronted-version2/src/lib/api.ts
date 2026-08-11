@@ -8,6 +8,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000
 export interface ApiError {
   status: number;
   message: string;
+  detail?: any;   // 结构化错误体（如 gate_blocked/consent_required/session_replaced）
 }
 
 /**
@@ -78,21 +79,25 @@ async function apiFetch<T>(
     
     if (!response.ok) {
       let message = response.statusText;
+      let detail: any = undefined;
       try {
         const data = await response.json();
         if (data.detail) {
-          message = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+          detail = data.detail;
+          message = typeof data.detail === 'string'
+            ? data.detail
+            : (data.detail.message || JSON.stringify(data.detail));
         }
       } catch {
         // ignore JSON parse error
       }
-      
+
       // 401 未授权，清除 token
       if (response.status === 401) {
         clearTokens();
       }
-      
-      throw { status: response.status, message } as ApiError;
+
+      throw { status: response.status, message, detail } as ApiError;
     }
     
     // 204 No Content
@@ -487,3 +492,130 @@ export const chatApi = {
 
 
 
+
+
+// ============================================================
+// 以下为 M2 新接口组（OTP 登录 / 深访 / 核验 / 订阅 / 推荐信 / 通知）
+// ============================================================
+
+/** 手机 OTP（BR-001：主登录路径，验证即登录） */
+export const otpApi = {
+  async request(phone: string) {
+    return apiFetch<{ message: string; resend_after: number; debug_code?: string }>(
+      '/auth/otp/request', { method: 'POST', body: JSON.stringify({ phone }) }, false);
+  },
+  async verify(phone: string, code: string) {
+    const tokens = await apiFetch<{ access_token: string; refresh_token: string; is_new_user: boolean }>(
+      '/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, code }) }, false);
+    saveTokens(tokens);
+    return tokens;
+  },
+};
+
+/** 当前用户（含状态机 status S1-S7，前端导航依据） */
+export const meApi = {
+  async get() {
+    return apiFetch<{ id: number; email?: string; phone?: string; status: string; is_active: boolean }>('/auth/me');
+  },
+};
+
+/** 深访（BR-201） */
+export const interviewApi = {
+  async getConsents() {
+    return apiFetch<{ granted: string[]; types: string[] }>('/interview/consent');
+  },
+  async grantConsents(types: string[]) {
+    return apiFetch<{ granted: string[] }>('/interview/consent', {
+      method: 'POST', body: JSON.stringify({ consent_types: types }) });
+  },
+  async start() {
+    return apiFetch<{ message: string | null; resumed: boolean; progress: any }>(
+      '/interview/start', { method: 'POST' });
+  },
+  async sendMessage(message: string) {
+    return apiFetch<{ message: string; progress: any; completed: boolean; crisis: boolean }>(
+      '/interview/message', { method: 'POST', body: JSON.stringify({ message }) });
+  },
+  async getProgress() {
+    return apiFetch<{ completion: number; missing_must: string[]; state: string }>('/interview/progress');
+  },
+  async getReport() {
+    return apiFetch<{ version: number; tier: string; sections: Record<string, string> }>('/interview/report');
+  },
+  async getHistory(limit = 50) {
+    return apiFetch<any[]>(`/ai-chat/history?conversation_type=interview&limit=${limit}`);
+  },
+};
+
+/** 核验（BR-107） */
+export const verificationApi = {
+  async status() {
+    return apiFetch<{ state: string; kyc_passed: boolean; photo_approved: boolean; phone_verified: boolean }>(
+      '/verification/status');
+  },
+  async startKyc() {
+    return apiFetch<any>('/verification/kyc/start', { method: 'POST' });
+  },
+  async devMockComplete(transactionId: string, payload: any) {
+    return apiFetch<any>('/verification/kyc/mock-complete', {
+      method: 'POST', body: JSON.stringify({ transaction_id: transactionId, ...payload }) });
+  },
+};
+
+/** AED 订阅（BR-501） */
+export const subscriptionApi = {
+  async products() {
+    return apiFetch<{ currency: string; items: any[] }>('/subscription/products', {}, false);
+  },
+  async checkout(sku: string, coupon?: string) {
+    return apiFetch<{ checkout_url: string; amount: number; dev_note?: string }>(
+      '/subscription/checkout', { method: 'POST', body: JSON.stringify({ sku, coupon }) });
+  },
+  async devMockPay(sku: string, coupon?: string) {
+    return apiFetch<{ message: string; tier: string; state: string }>(
+      '/subscription/dev/mock-pay', { method: 'POST', body: JSON.stringify({ sku, coupon }) });
+  },
+  async status() {
+    return apiFetch<any>('/subscription/status');
+  },
+  async cancel(reasonCode?: string) {
+    return apiFetch<any>('/subscription/cancel', {
+      method: 'POST', body: JSON.stringify({ reason_code: reasonCode }) });
+  },
+};
+
+/** 推荐信（BR-301/303） */
+export const recommendationApi = {
+  async list() {
+    return apiFetch<any>('/recommendations');
+  },
+  async detail(pairId: number) {
+    return apiFetch<any>(`/recommendations/${pairId}`);
+  },
+  async respond(pairId: number, action: 'accept' | 'more_info' | 'decline',
+                opts?: { note?: string; decline_reason?: string }) {
+    return apiFetch<any>(`/recommendations/${pairId}/respond`, {
+      method: 'POST', body: JSON.stringify({ action, ...opts }) });
+  },
+  async confirmSketch() {
+    return apiFetch<{ message: string; sketch: string }>(
+      '/recommendations/sketch/confirm', { method: 'POST' });
+  },
+};
+
+/** 通知（站内信） */
+export const notificationApi = {
+  async unreadCount() {
+    return apiFetch<{ unread_count: number }>('/notifications/unread-count');
+  },
+  async list(page = 1) {
+    return apiFetch<{ items: any[]; total: number; unread_count: number }>(
+      `/notifications?page=${page}&page_size=20`);
+  },
+  async markRead(id: number) {
+    return apiFetch<any>(`/notifications/${id}/read`, { method: 'POST' });
+  },
+  async markAllRead() {
+    return apiFetch<any>('/notifications/read-all', { method: 'POST' });
+  },
+};
