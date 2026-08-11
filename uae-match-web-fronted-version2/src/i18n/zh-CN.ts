@@ -53,6 +53,10 @@ export const zhCN = {
     sketchConfirmTitle: '确认你的画像速写',
     sketchConfirmBody: '当把你推荐给合适的人时，对方会看到这段介绍。确认后你将进入候补池。',
     sketchConfirmBtn: '确认，用它介绍我',
+    pauseBtn: '稍后继续',
+    pausedTitle: '进度已保存',
+    pausedBody: '和小缘的对话随时可以接着聊，不需要一次聊完。完成基本了解后会自动进入下一步（身份核验）。',
+    resumeBtn: '继续对话',
   },
   verification: {
     title: '身份核验',

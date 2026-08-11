@@ -4,8 +4,8 @@
  *     → 完成 → 画像报告 → 速写确认（进入候补池前置）。
  */
 import { useEffect, useRef, useState } from 'react';
-import { Send, Sparkles, FileText, ShieldCheck } from 'lucide-react';
-import { interviewApi, recommendationApi, ApiError } from '../lib/api';
+import { Send, Sparkles, FileText, ShieldCheck, PauseCircle } from 'lucide-react';
+import { interviewApi, recommendationApi, authApi, ApiError } from '../lib/api';
 import { t } from '../i18n';
 
 interface Msg { role: 'user' | 'assistant'; content: string; }
@@ -15,7 +15,7 @@ interface InterviewPageProps {
 }
 
 export function InterviewPage({ onCompleted }: InterviewPageProps) {
-  const [phase, setPhase] = useState<'consent' | 'chat' | 'report'>('consent');
+  const [phase, setPhase] = useState<'consent' | 'chat' | 'report' | 'paused'>('consent');
   const [consents, setConsents] = useState<{ basic: boolean; sensitive: boolean; ai_processing: boolean }>({
     basic: true, sensitive: true, ai_processing: true,
   });
@@ -153,6 +153,29 @@ export function InterviewPage({ onCompleted }: InterviewPageProps) {
     );
   }
 
+  // ===== 暂停屏 =====
+  if (phase === 'paused') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-orange-50 to-pink-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white/90 rounded-3xl shadow-xl p-8 border border-rose-100 text-center">
+          <PauseCircle className="w-10 h-10 text-[#E07A5F] mx-auto mb-4" />
+          <h2 className="text-xl mb-2">{t('interview.pausedTitle')}</h2>
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">{t('interview.pausedBody')}</p>
+          <button
+            onClick={() => setPhase('chat')}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-500 to-orange-500 text-white text-sm mb-3">
+            {t('interview.resumeBtn')}
+          </button>
+          <button
+            onClick={() => { authApi.logout(); window.location.reload(); }}
+            className="w-full py-2.5 rounded-xl text-gray-400 text-sm hover:text-gray-600">
+            {t('common.logout')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ===== 报告页 =====
   if (phase === 'report' && report) {
     return (
@@ -193,7 +216,14 @@ export function InterviewPage({ onCompleted }: InterviewPageProps) {
               <Sparkles className="w-4 h-4 text-[#E07A5F]" />
               <span className="text-sm">{t('interview.title')}</span>
             </div>
-            <span className="text-xs text-gray-500">{t('interview.progressLabel')} {progress}%</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">{t('interview.progressLabel')} {progress}%</span>
+              <button
+                onClick={() => setPhase('paused')}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-[#E07A5F]">
+                <PauseCircle className="w-3.5 h-3.5" /> {t('interview.pauseBtn')}
+              </button>
+            </div>
           </div>
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-rose-400 to-orange-400 transition-all duration-500"

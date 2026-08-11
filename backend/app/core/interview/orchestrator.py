@@ -31,6 +31,10 @@ SESSION_SOFT_CAP_TURNS = 18  # 首次会话软上限（PRD 5.1：15-20 个提问
 FATIGUE_SHORT_LEN = 6        # 疲劳信号：连续短回答阈值（字符）
 FATIGUE_WORDS = ("嗯", "都行", "随便", "还好", "不知道", "哦")
 
+# 明确停止意愿（比疲劳信号更强）：命中即本轮收尾，绝不再问（PRD 5.1：节奏由用户掌控）
+STOP_PHRASES = ("不想聊", "不想回答", "不聊了", "不说了", "先到这里", "改天", "下次再",
+                "暂停", "停一下", "别问了", "跳过", "下一步", "下一个页面", "换个页面")
+
 _CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 
@@ -214,9 +218,10 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
 
     # 3) 缺口与状态
     progress = compute_progress(db, user.id)
+    stop_intent = any(p in message for p in STOP_PHRASES)
     fatigue = detect_fatigue(history + [type("M", (), {"role": "user", "content": message})()])
     session_turns = sum(1 for h in history if h.role == "user") + 1
-    wrap_up = fatigue or session_turns >= SESSION_SOFT_CAP_TURNS
+    wrap_up = stop_intent or fatigue or session_turns >= SESSION_SOFT_CAP_TURNS
 
     completed = False
     if not progress["missing_must"]:
@@ -231,6 +236,12 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
 
     if completed:
         instruction = "【收尾指令】必采信息已全部完成。感谢用户的坦诚，告诉用户：画像报告正在生成、下一步是身份核验。语气要有仪式感。"
+    elif stop_intent:
+        instruction = (
+            "【收尾指令·用户明确要停】用户表达了不想继续/想离开的意愿。本轮绝对禁止再提任何问题。"
+            "回应要点：①爽快答应，不挽留不解释价值；②告诉用户进度已保存，随时回来接着聊，页面右上角可以'稍后继续'；"
+            "③若用户问能否进入下一步/下一个页面：如实说明完成基本了解后会自动进入身份核验环节，现在可以先休息，不需要一次聊完。"
+        )
     elif wrap_up:
         instruction = "【收尾指令】检测到用户疲劳或本次会话已到软上限。立即温和收尾并给正反馈（如'今天已经够我为你准备第一步了，剩下的我们边处边聊'），本轮不再提任何新问题。"
     else:
@@ -254,6 +265,9 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
 
     if fatigue:
         log_event(db, user_id=user.id, event_type="fatigue_triggered",
+                  metadata={"session_turns": session_turns})
+    if stop_intent:
+        log_event(db, user_id=user.id, event_type="interview_paused",
                   metadata={"session_turns": session_turns})
 
     return {"message": resp["content"], "progress": progress,
