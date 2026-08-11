@@ -54,6 +54,12 @@ class UserProfile(Base):
     # 深访完成时间（必采 A-D 100% 时写入，同时触发 S1→S2）
     interview_completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # 婚姻状况（A3，BR-109 申报带入；访谈仅补语境）
+    marital_history = Column(String(20), nullable=True)   # never_married / divorced / widowed
+
+    # 画像速写确认（PRD 6.5）：未确认前不得出现在他人推荐中（Stage 0.2）
+    sketch_confirmed_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

@@ -252,4 +252,11 @@ def _complete_interview(db: Session, user: User) -> bool:
         generate_report(db, user)
     except Exception:
         logger.exception("画像报告生成失败（可重试） user_id=%s", user.id)
+
+    # 画像向量（推荐引擎 Stage 3 语义调整的输入）
+    try:
+        from app.core.embedding_service import get_embedding_service
+        get_embedding_service().create_or_update_embedding(db, user.id)
+    except Exception:
+        logger.exception("画像向量生成失败（不阻塞完成） user_id=%s", user.id)
     return True

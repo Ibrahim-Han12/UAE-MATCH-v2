@@ -1,9 +1,14 @@
-from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+"""
+通知端点（HLD §8 站内信必达底座）。v1.0 桩实现已由真实落库取代。
+"""
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_active_user
 from app.models.user import User
+from app.models.reco_pair import Notification
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -13,63 +18,56 @@ def get_unread_count(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """
-    获取当前用户的未读通知数量
-    目前返回0，后续可以接入真正的通知系统
-    """
-    # TODO: 实现真正的通知系统后，这里应该查询数据库中的未读通知数量
-    # 目前先返回0，避免前端404错误
-    return {"unread_count": 0}
+    count = db.query(Notification).filter_by(user_id=current_user.id, is_read=0).count()
+    return {"unread_count": count}
 
 
 @router.get("")
-def get_notifications(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    is_read: Optional[bool] = Query(None),
+def list_notifications(
+    page: int = 1,
+    page_size: int = 20,
+    is_read: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """
-    获取当前用户的通知列表
-    目前返回空列表，后续可以接入真正的通知系统
-    """
-    # TODO: 实现真正的通知系统后，这里应该查询数据库中的通知
-    # 目前先返回空列表，避免前端404错误
-    return {
-        "items": [],
-        "notifications": [],
-        "results": [],
-        "total": 0,
-        "unread_count": 0,
-    }
+    q = db.query(Notification).filter_by(user_id=current_user.id)
+    if is_read is not None:
+        q = q.filter(Notification.is_read == (1 if is_read else 0))
+    total = q.count()
+    rows = (
+        q.order_by(Notification.created_at.desc())
+        .offset(max(0, (page - 1) * page_size)).limit(min(page_size, 100)).all()
+    )
+    items = [{
+        "id": n.id, "type": n.type, "title": n.title, "body": n.body,
+        "payload": n.payload, "is_read": bool(n.is_read), "created_at": n.created_at,
+    } for n in rows]
+    unread = db.query(Notification).filter_by(user_id=current_user.id, is_read=0).count()
+    return {"items": items, "total": total, "unread_count": unread}
 
 
 @router.post("/{notification_id}/read")
-def mark_notification_as_read(
+def mark_read(
     notification_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """
-    标记通知为已读
-    目前只是占位，后续可以接入真正的通知系统
-    """
-    # TODO: 实现真正的通知系统后，这里应该更新数据库中的通知状态
-    return {"message": "通知已标记为已读"}
+    n = db.query(Notification).filter_by(id=notification_id, user_id=current_user.id).first()
+    if n is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知不存在")
+    n.is_read = 1
+    db.commit()
+    return {"message": "已标记为已读"}
 
 
 @router.post("/read-all")
-def mark_all_as_read(
+def mark_all_read(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """
-    标记所有通知为已读
-    目前只是占位，后续可以接入真正的通知系统
-    """
-    # TODO: 实现真正的通知系统后，这里应该批量更新数据库中的通知状态
-    return {"message": "所有通知已标记为已读"}
+    db.query(Notification).filter_by(user_id=current_user.id, is_read=0).update({"is_read": 1})
+    db.commit()
+    return {"message": "全部已读"}
 
 
 @router.delete("/{notification_id}")
@@ -78,21 +76,9 @@ def delete_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """
-    删除通知
-    目前只是占位，后续可以接入真正的通知系统
-    """
-    # TODO: 实现真正的通知系统后，这里应该从数据库中删除通知
-    return {"message": "通知已删除"}
-
-
-
-
-
-
-
-
-
-
-
-
+    n = db.query(Notification).filter_by(id=notification_id, user_id=current_user.id).first()
+    if n is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知不存在")
+    db.delete(n)
+    db.commit()
+    return {"message": "已删除"}

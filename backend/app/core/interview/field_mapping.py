@@ -43,6 +43,17 @@ PREFERENCE_OBJECT_ROUTES = {
 # C1-C4 抽取结果里可带 elasticity_value 子键 → 汇入 preferences.elasticity JSON
 ELASTIC_FIELDS = ("C1", "C2", "C3", "C4")
 
+# E 类尽量采 + F4 → user_profiles.extended_info JSON（键名 = Schema key）
+EXTENDED_JSON_ROUTES = {
+    "E3": "daily_rhythm",
+    "E4": "diet_habit",
+    "E5": "smoking_drinking",
+    "E6": "religion",
+    "E7": "social_radius",
+    "E8": "interest_tags",
+    "F4": "ideal_weekend",
+}
+
 # D 类完成度检查：psych profile 列非空即视为已采
 PSYCH_FILLED_COLUMNS = {
     "D1": "attachment_style",
@@ -77,6 +88,13 @@ def apply_field(db: Session, user_id: int, field_id: str, value: Any) -> bool:
             row.return_horizon_years = value["return_horizon_years"]
         return True
     # B1 的 enum+extra 混合形态：值为纯枚举字符串时走 PROFILE_ROUTES（上面已覆盖）
+
+    if field_id in EXTENDED_JSON_ROUTES:
+        row = _get_or_create(db, UserProfile, user_id)
+        ext = dict(row.extended_info or {})
+        ext[EXTENDED_JSON_ROUTES[field_id]] = value
+        row.extended_info = ext
+        return True
 
     if field_id in PREFERENCE_ROUTES:
         row = _get_or_create(db, MatchPreference, user_id)

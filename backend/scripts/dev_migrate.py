@@ -38,6 +38,9 @@ ALTERS = [
     "ALTER TABLE match_preferences ADD COLUMN IF NOT EXISTS same_emirate_only BOOLEAN",
     "ALTER TABLE match_preferences ADD COLUMN IF NOT EXISTS dealbreakers JSON",
     "ALTER TABLE match_preferences ADD COLUMN IF NOT EXISTS elasticity JSON",
+    # ⑤ 推荐流水线
+    "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS marital_history VARCHAR(20)",
+    "ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS sketch_confirmed_at TIMESTAMPTZ",
 ]
 
 

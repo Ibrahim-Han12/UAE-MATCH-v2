@@ -1,0 +1,117 @@
+# =============================================================
+# UAE Match · 匹配算法配置 v0.4
+# 权威依据: docs/matching-algorithm-design.md v0.4(已裁决 Q1-Q3/G1-G4)
+# 铁律: 全部权重与阈值在此,业务代码零硬编码;F1/F2 权重恒为零不可配
+# S2 校准期(第4周首次复盘)修改本文件并升版,勿改代码
+# =============================================================
+meta:
+  version: 0.4.0
+  authority: matching-algorithm-design.md v0.4
+
+thresholds:
+  steady_state: 70          # 稳态阈值
+  cold_start: 65            # 冷启动(池<200人)
+  cold_start_pool_size: 200
+  grey_zone_floor: 65       # 灰区下限(稳态);冷启动 55
+  cold_grey_floor: 55
+  absolute_floor: 55        # 55 以下任何情况不推——产品承诺,非参数(Q2)
+
+allocation:
+  max_letters_per_user_per_week: 3   # 每人每周收到 ≤3(PRD)
+  max_exposure_per_user_per_week: 3  # 同周最多出现在 3 人推荐中(Q3)
+  response_window_hours: 72          # 72h 响应时限(PRD 6.3)
+  more_info_extension_hours: 48      # "想再了解"延长 48h,仅一次
+
+repeat_recommendation:
+  min_weeks_gap: 8          # 重推最小间隔(且需重大变更重算)
+
+elasticity:
+  default: hard             # 弹性缺失时按 hard(宁缺毋滥)
+  age_extension_years: 2    # negotiable 扩展带
+  height_extension_cm: 3
+  edu_income_notch_down: 1
+  boolean_negotiable_penalty: 3   # G3: 布尔型 negotiable=不过滤记-3
+
+scoring:
+  dimensions:               # 五维满分(合计100)
+    life_plan: 30
+    psych: 25
+    values: 20
+    lifestyle: 15
+    condition_fit: 10
+  semantic_bonus_max: 5     # Stage 3 封顶(tiebreaker,未验证前不许主导)
+  inferred_confidence_factor: 0.8   # 置信度 inferred 的子项 ×0.8(4.6)
+
+life_plan:                  # 4.1
+  b1_matrix:                # 去留规划组合 → 因子(R6 已过滤 filter 组合)
+    long_term_stay:
+      long_term_stay: 1.0
+      depends_on_marriage: 1.0
+      undecided: 0.6
+    return_within_years:
+      return_within_years: 1.0
+      depends_on_marriage: 1.0
+      undecided: 0.55
+    depends_on_marriage:
+      depends_on_marriage: 1.0
+      undecided: 0.7
+    undecided:
+      undecided: 0.5
+  b2_timeline_factors: {0: 1.0, 1: 0.7, 2: 0.3}   # 档位差→因子(差2=-70%)
+  b3_children:
+    same: 1.0
+    yes_open: 0.6            # yes × open_to_discuss = -40%
+    open_open: 0.8
+  b4_elders:
+    same: 1.0
+    conflict_bring_vs_return: 0.5   # 高频雷区,权重要疼
+    other: 0.75
+
+psych:                      # 4.2
+  d1_attachment_matrix:
+    secure:   {secure: 1.0, anxious: 0.85, avoidant: 0.85, mixed_unclear: 0.9}
+    anxious:  {anxious: 0.6, avoidant: 0.25, mixed_unclear: 0.7}   # 高危0.25软过滤
+    avoidant: {avoidant: 0.55, mixed_unclear: 0.7}
+    mixed_unclear: {mixed_unclear: 0.75}
+  d2_conflict_matrix:
+    collaborative: {collaborative: 1.0, accommodating: 0.85, avoidant_withdraw: 0.85, competitive: 0.85, unclear: 0.85}
+    accommodating: {accommodating: 0.7, avoidant_withdraw: 0.6, competitive: 0.55, unclear: 0.7}
+    avoidant_withdraw: {avoidant_withdraw: 0.4, competitive: 0.5, unclear: 0.6}
+    competitive: {competitive: 0.45, unclear: 0.6}
+    unclear: {unclear: 0.7}
+  neuroticism_high_threshold: 0.7
+  neuroticism_double_high_factor: 0.6    # 双高降权(BR-306)
+  conscientiousness_gap_threshold: 0.4   # G2
+  conscientiousness_gap_factor: 0.85     # 温和降权("提示"非过滤)
+
+values:                     # 4.3(相似性加权,不做互补假设)
+  d3_subitem: {same: 1.0, one_flexible: 0.7, differ: 0.35}
+  d4_money_matrix:
+    saver: {saver: 1.0, balanced: 0.8, spender_experience: 0.3, investor_risk_taker: 0.6}
+    balanced: {balanced: 1.0, spender_experience: 0.7, investor_risk_taker: 0.7}
+    spender_experience: {spender_experience: 1.0, investor_risk_taker: 0.7}
+    investor_risk_taker: {investor_risk_taker: 1.0}
+  e6_practice_same_bonus: 1.0   # 实践程度接近作为加分子项
+
+lifestyle:                  # 4.4
+  e3_rhythm: {same: 1.0, flexible: 0.8, differ: 0.4}
+  e5_diff_factors: {0: 1.0, 1: 0.6, 2: 0.2}
+  e7_diff_factors: {0: 1.0, 1: 0.7, 2: 0.3}
+  e8_overlap_divisor: 3     # 交集/3 封顶1
+  a8_distance: {same_district: 1.0, same_emirate: 0.8, cross_emirate: 0.5}
+
+condition_fit:              # 4.5
+  base: 10
+  negotiable_extension_penalty: 3
+  negotiable_penalty_cap: 6
+  preference_unmet_penalty: 2
+
+hard_rules:                 # Stage 1
+  r6_b1_filter_pairs:       # 去留冲突矩阵中的 ❌ 组合
+    - [long_term_stay, return_within_years]
+  r6_return_window_max_gap_years: 2
+  r7_timeline_filter_gap: 3   # 档位差≥3 过滤
+  b2_order: {within_1y: 0, 1_2y: 1, 2_3y: 2, no_rush: 3}
+  education_rank: {high_school: 0, college: 1, bachelor: 2, master: 3, phd: 4}
+  income_rank: {below_10k: 0, 10k_20k: 1, 20k_35k: 2, 35k_50k: 3, above_50k: 4}
+  income_floor_rank: {none: -1, 10k_20k: 1, 20k_35k: 2, above_35k: 3}
