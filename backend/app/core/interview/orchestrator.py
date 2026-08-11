@@ -130,7 +130,11 @@ def _build_suggestion_block(db: Session, user_id: int, field: dict) -> str:
     """把目标字段的问法建议装配为注入指令（LLM 须改写，禁止照读）。"""
     entry = ic.bank_entry_for(field["id"]) or {}
     lines = [f"【本轮建议】目标信息：{field.get('label_zh')}（{field['id']}）"]
-    lines.append(f"【已知事实】{_known_facts_block(db, user_id)}")
+    lines.append(
+        f"【已知事实·仅作背景】{_known_facts_block(db, user_id)}"
+        "（这些是资料库中的既有信息，不是用户本轮说的话——禁止对其表示感谢或当作用户刚确认的内容；"
+        "回应只针对用户本轮实际说的内容）"
+    )
     if entry.get("sensitivity_strategy"):
         lines.append(f"敏感策略：{entry['sensitivity_strategy']}")
     for a in (entry.get("approaches") or [])[:3]:
