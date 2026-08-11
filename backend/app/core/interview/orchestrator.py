@@ -110,10 +110,27 @@ def _pick_target(missing_must: List[str], sensitive_ok: bool) -> Optional[dict]:
     return None
 
 
-def _build_suggestion_block(field: dict) -> str:
+def _known_facts_block(db: Session, user_id: int) -> str:
+    """关键已知事实——问法选择的依据（防止预设错误事实，如对未婚用户问"之前的婚姻"）。"""
+    p = db.query(UserProfile).filter_by(user_id=user_id).first()
+    facts = []
+    if p is not None:
+        marital = {"never_married": "未婚", "divorced": "离异", "widowed": "丧偶"}.get(p.marital_history)
+        facts.append(f"婚史：{marital or '未知'}")
+        if p.has_children:
+            facts.append(f"有无孩子：{'有' if p.has_children.get('has') == 'yes' else '无'}")
+        if p.gender:
+            facts.append(f"性别：{p.gender}")
+    else:
+        facts.append("婚史：未知")
+    return "；".join(facts)
+
+
+def _build_suggestion_block(db: Session, user_id: int, field: dict) -> str:
     """把目标字段的问法建议装配为注入指令（LLM 须改写，禁止照读）。"""
     entry = ic.bank_entry_for(field["id"]) or {}
     lines = [f"【本轮建议】目标信息：{field.get('label_zh')}（{field['id']}）"]
+    lines.append(f"【已知事实】{_known_facts_block(db, user_id)}")
     if entry.get("sensitivity_strategy"):
         lines.append(f"敏感策略：{entry['sensitivity_strategy']}")
     for a in (entry.get("approaches") or [])[:3]:
@@ -126,7 +143,13 @@ def _build_suggestion_block(field: dict) -> str:
     probe = entry.get("probe") or {}
     if probe.get("probe_text"):
         lines.append(f"追问（仅当 {probe.get('trigger')}，最多 1 层）：{probe['probe_text']}")
-    lines.append("结合当前对话语境改写为自然的话，单轮只问一个问题。用户若聊到其他话题，可顺势采集不必拉回。")
+    lines.append(
+        "执行要求："
+        "①先用一两句自然回应用户刚才说的内容——若用户纠正了信息或你的假设，必须先确认更正，绝不装作没听见；"
+        "②问法的适用条件必须对照【已知事实】选择——事实未知或与问法前提不符时，禁用预设该事实的问法，改用中性问法；"
+        "③结合语境改写，禁止照读，禁止重复你之前用过的过渡句式；"
+        "④单轮只问一个问题；用户聊到其他话题可顺势采集不必拉回。"
+    )
     return "\n".join(lines)
 
 
@@ -209,7 +232,7 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     else:
         target = _pick_target(progress["missing_must"], sensitive_ok)
         if target is not None:
-            instruction = _build_suggestion_block(target)
+            instruction = _build_suggestion_block(db, user.id, target)
         else:
             instruction = "【本轮建议】剩余待采信息均为敏感项，但用户尚未授权敏感画像采集。自然地聊当前话题，并在合适时机说明授权的价值（不施压）。"
 

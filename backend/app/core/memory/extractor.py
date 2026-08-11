@@ -113,6 +113,11 @@ def extract_from_conversation(
             if f.get("source") == "interview"
             and f.get("required_level") in ("must", "should")
         ]
+        # A3 婚史例外：申报环节(BR-109)未建前，用户主动明说时允许抽取
+        # （如"我没结过婚"必须被听见——否则问法选择会预设错误婚史）
+        a3 = interview_config.field_by_id("A3")
+        if a3 is not None and not any(f["id"] == "A3" for f in targets):
+            targets.insert(0, a3)
 
     resp = get_ai_gateway().chat(
         db, user_id=user_id, task=Task.MEMORY_EXTRACTION,

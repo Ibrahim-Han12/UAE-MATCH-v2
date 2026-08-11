@@ -14,6 +14,7 @@ from app.models.user_psych_profile import UserPsychProfile
 
 # field_id → (model, column)。value 直接 setattr；对象/数组型列为 JSON。
 PROFILE_ROUTES = {
+    "A3": "marital_history",   # 例外：申报环节未建前，用户主动明说的婚史允许抽取落库（仅 stated）
     "A4": "height_cm",
     "A7": "income_band_aed",
     "A9": "visa_type",

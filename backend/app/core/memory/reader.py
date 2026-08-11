@@ -77,6 +77,9 @@ def build_profile_summary(db: Session, user_id: int, max_events: int = 3) -> str
         if p.current_city: basics.append(f"城市:{p.current_city}")
         if p.occupation: basics.append(f"职业:{p.occupation}")
         if p.education_level: basics.append(f"学历:{p.education_level}")
+        marital = {"never_married": "未婚", "divorced": "离异", "widowed": "丧偶"}.get(p.marital_history or "")
+        if marital: basics.append(f"婚史:{marital}")
+        if p.has_children: basics.append(f"孩子:{'有' if p.has_children.get('has') == 'yes' else '无'}")
         if basics:
             parts.append("【基础】" + "；".join(basics))
         if p.bio:
