@@ -46,12 +46,22 @@ def get_current_user(
         user_id: Optional[str] = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        token_sid: Optional[str] = payload.get("sid")
     except JWTError:
         raise credentials_exception
 
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None:
         raise credentials_exception
+
+    # 单设备在线（BR-002）：账号已在新设备登录后，旧 token 的 sid 与库中不一致即失效。
+    # user.current_session_id 为空（历史账号从未新式登录）时不启用检查。
+    if user.current_session_id and token_sid != user.current_session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "session_replaced", "message": "账号已在其他设备登录"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return user
 
@@ -60,14 +70,35 @@ def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """
-    额外检查：用户是否处于激活状态。
+    基础可用性检查：is_active 且非封禁（S7）。
+    状态机门禁（深访/核验/付费三道闸）用 require_state()，不在这里做。
     """
-    if not current_user.is_active or current_user.status != "active":
+    from app.core.state_machine import effective_state, S7
+
+    if not current_user.is_active or effective_state(current_user) == S7:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户已被禁用",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "banned", "message": "账号已被封禁，仅可申诉"},
         )
     return current_user
+
+
+def require_state(min_state: str):
+    """
+    状态机门禁依赖工厂（HLD §4.2）。用法：
+        @router.get("/recommendations", dependencies=[Depends(require_state("S4"))])
+    或   user: User = Depends(require_state("S3"))
+    不满足时返回 403 结构化响应（code=gate_blocked, gate=interview/verification/payment），
+    前端据此导流到对应闸。
+    """
+    def _dep(current_user: User = Depends(get_current_active_user)) -> User:
+        from app.core.state_machine import meets_min_state, gate_error
+
+        if not meets_min_state(current_user, min_state):
+            raise gate_error(current_user, min_state)
+        return current_user
+
+    return _dep
 
 
 def get_current_admin_user(

@@ -18,7 +18,15 @@ class User(Base):
 
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)  # 管理员标识
-    status = Column(String(50), default="active", nullable=False)
+
+    # 用户状态机 S1-S7（PRD 2.2）；一切变更须经 core.state_machine.transition()
+    status = Column(String(50), default="S1", nullable=False)
+
+    # 单设备在线（BR-002）：当前有效会话 ID；新登录刷新它 → 旧 token 立即失效
+    current_session_id = Column(String(36), nullable=True)
+
+    # 手机验证时间（PRD 15 漏斗起点 phone_verified；OTP 验证即登录时写入）
+    phone_verified_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(

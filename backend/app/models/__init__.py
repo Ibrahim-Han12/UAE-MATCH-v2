@@ -10,3 +10,5 @@ from app.models.memory_event import MemoryEvent  # noqa: F401
 from app.models.user_comm_profile import UserCommProfile  # noqa: F401
 from app.models.memory_vector import MemoryVector  # noqa: F401
 from app.models.memory_pending_change import MemoryPendingChange  # noqa: F401
+from app.models.user_state_transition import UserStateTransition  # noqa: F401
+from app.models.phone_otp import PhoneOtp  # noqa: F401

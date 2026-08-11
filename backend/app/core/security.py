@@ -25,12 +25,19 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    subject: str,
+    expires_delta: Optional[timedelta] = None,
+    session_id: Optional[str] = None,
+) -> str:
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     expire = datetime.utcnow() + expires_delta
     to_encode: dict[str, Any] = {"exp": expire, "sub": str(subject)}
+    if session_id:
+        # 单设备在线（BR-002）：sid 与 users.current_session_id 比对，不匹配即失效
+        to_encode["sid"] = session_id
 
     encoded_jwt = jwt.encode(
         to_encode,
@@ -40,7 +47,11 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
     return encoded_jwt
 
 
-def create_refresh_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
+def create_refresh_token(
+    subject: str,
+    expires_delta: Optional[timedelta] = None,
+    session_id: Optional[str] = None,
+) -> str:
     if expires_delta is None:
         expires_delta = timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS) \
             if hasattr(settings, "JWT_REFRESH_TOKEN_EXPIRE_DAYS") \
@@ -48,6 +59,8 @@ def create_refresh_token(subject: str, expires_delta: Optional[timedelta] = None
 
     expire = datetime.utcnow() + expires_delta
     to_encode: dict[str, Any] = {"exp": expire, "sub": str(subject)}
+    if session_id:
+        to_encode["sid"] = session_id
 
     encoded_jwt = jwt.encode(
         to_encode,

@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     WECHAT_API_KEY: str = ""  # 微信API密钥
     PAYMENT_NOTIFY_URL: str = ""  # 支付回调URL
 
+    # 短信通道（B2 供应商未定，先 mock；生产接真实 provider 后改此值）
+    SMS_PROVIDER: str = "mock"
+
     # OpenAI配置
     OPENAI_API_KEY: str = ""  # OpenAI API Key（从环境变量读取）
     OPENAI_MODEL_GPT4O_MINI: str = "gpt-4o-mini"  # 主要模型：成本低、速度快、性能好
