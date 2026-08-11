@@ -1,6 +1,6 @@
 # =============================================================
 # UAE Match · 深访信息目标 Schema
-# 版本: v0.3.0 | 日期: 2026-08-11 | 权威依据: PRD v1.1 §5.2
+# 版本: v0.3.1 | 日期: 2026-08-11 | 权威依据: PRD v1.1 §5.2
 # v0.2 变更: C5 改 per-item 弹性; C4 移除 accept_remote_china(由 B6 派生); A7 口径对齐问法库
 # v0.3 变更(G1 裁决): 新增 A10 has_children 事实字段——修复"偏好侧存在(B3)而事实侧缺失"的缺口;
 #                     必采 24→25,触顶治理上限,下一个必采字段须置换
@@ -10,7 +10,7 @@
 # =============================================================
 
 meta:
-  version: 0.3.0
+  version: 0.3.1
   authority: "PRD v1.1 §5.2"
   governance:
     must_field_cap: 25            # 必采字段硬上限;新增必采须同时移除或降级一项
@@ -216,6 +216,9 @@ fields:
       language_requirement: {type: enum, enum: [mandarin_required, english_ok, any], required: false}
     sensitivity: high
     matching_weight: none_v1        # v1 仅采集不参与匹配;Phase 2 启用(BRD 2.5)
+    # 豁免(G4 裁决,v0.3.1): 仅 religion_constraint 子项供匹配规则 R9 过滤消费——
+    # 宗教约束在纯华人池内亦为真实约束;nationality_scope / language_requirement
+    # 两个子项 v1 严格不参与任何匹配计算,豁免范围不得扩大
     recalc_trigger: phase2_only
 
   - id: B6

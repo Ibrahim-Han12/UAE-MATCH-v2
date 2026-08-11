@@ -1,6 +1,7 @@
-# UAE Match · 匹配算法设计 v0.3
+# UAE Match · 匹配算法设计 v0.4
 
-> 权威依据:BR-306 / PRD 6.1(T-3 计算)/ BRD 5.3.6(心理框架分层)/ interview_schema.yaml v0.3
+> 权威依据:BR-306 / PRD 6.1(T-3 计算)/ BRD 5.3.6(心理框架分层)/ interview_schema.yaml v0.3.1
+> v0.4 变更(2026-08-12,G2-G4 裁决):G2 尽责性差距规则补入 4.2(阈值0.4,×0.85 温和降权,喂 friction_point);G3 布尔型字段 negotiable 语义=不过滤记-3分;G4 B5.religion_constraint 为 none_v1 唯一豁免(范围见 Schema v0.3.1 注释)
 > v0.3 变更(2026-08-12,G1 裁决):R5/R8 的"对方有孩"由推断改为引用 A10 has_children stated 事实字段;living_arrangement 进 Stage 2 计分
 > v0.2 变更(2026-08-12):合入产品裁决——Q1 异性匹配升格为 UAE 法域合规约束;Q2 阈值 70/65 起步确认(S2 第 4 周首次校准);Q3 热门用户周曝光上限=3 确认
 > 消费方:推荐流水线 T-3 阶段(HLD §7);推荐语生成(BR-302,引用 score breakdown)
@@ -48,7 +49,7 @@
 | 弹性值 | 过滤行为 |
 |---|---|
 | hard | 严格过滤,不满足即出局 |
-| negotiable | **不过滤**;允许在标称范围外扩展一档(年龄 ±2 岁、身高 ±3cm、收入/学历下探一档),进入计分但记减分(§4.5) |
+| negotiable | **不过滤**;区间/档位型字段允许在标称范围外扩展一档(年龄 ±2 岁、身高 ±3cm、收入/学历下探一档);**布尔型字段(如 C4.same_emirate_only)无“扩一档”概念,negotiable 语义统一为“不过滤、记 -3 分”(与 §4.5 扩展带扣分同轨,G3 裁决)**——该语义对未来新增布尔型条件自动继承 |
 | preference | 不过滤,仅计分 |
 
 **逐项规则**(全部双向执行,A 满足 B 的条件 且 B 满足 A 的条件):
@@ -67,7 +68,7 @@
   | undecided | ⚠️ | ⚠️ | ✅ | ⚠️ |
 - **R7 结婚时间线(B2)**:档位差 ≥3(within_1y × no_rush)→ 过滤;差 =2 → 通过但计分强降(§4.1)。依据 BRD 3.3"差距 >2 档提示预期错位",此处将"提示"落为分级处置。
 - **R8 子女计划(B3)**:want=yes × want=no → 过滤;yes × open_to_discuss → 通过计分;对方 A10.has=yes × accept_partner_with_children=no → 过滤(A10 为 stated 必采,无置信度豁免);living_arrangement 进入 Stage 2 计分(孩子随行 vs 国内 vs 成年独立,对接受方的现实差异)。
-- **R9 宗教约束(E6/B5.religion_constraint)**:仅当任一方明示约束(如 same_faith_only)且对方事实明确冲突时过滤;字段缺失不过滤(E 类不阻塞)。
+- **R9 宗教约束(E6/B5.religion_constraint)**:仅当任一方明示约束(如 same_faith_only)且对方事实(E6)明确冲突时过滤;字段缺失不过滤(E 类不阻塞)。**注:B5 整体标记 v1 不参与匹配,religion_constraint 子项为唯一豁免(G4 裁决,豁免范围详见 Schema B5 注释)——宗教约束在纯华人池内亦为真实匹配约束,与跨文化开放度的 Phase 2 定位无关。**
 
 ## 4. Stage 2 规则计分(0–100,五维加权)
 
@@ -89,6 +90,7 @@
   anxious×avoidant 为高危配对(BR-306),乘 25% 而非过滤——保留人工终审捞回的可能,但综合分基本无法达标,机制上"软过滤"。
 - **冲突风格(D2)**:collaborative×any ≥85%;avoidant_withdraw×avoidant_withdraw = 40%(双回避=问题永不解决);competitive×competitive = 45%;accommodating×competitive = 55%(长期失衡模式)。
 - **神经质(E1,存在时)**:双方 neuroticism 均 > 配置阈值(初值 0.7)→ 本维度整体 ×0.6(双高降权,BR-306);E1 缺失则跳过该项并下调本维度置信度(§4.6)。
+- **尽责性差距(E1,存在时,G2 补入)**:双方 conscientiousness 差距 > 配置阈值(初值 0.4,归一化)→ 本维度 ×0.85(温和降权——BRD 5.3.6 原文定性为“提示”而非过滤),并将该差距写入 friction_point 候选(“计划型 × 随性型”是推荐信诚实差异点的优质素材);缺失跳过,同神经质机制。
 
 ### 4.3 价值观相似 — 20 分
 D3 三子项(财务/事业/家务)逐项同向计分;D4 金钱观:同型满分,saver×spender_experience = 30%,其余组合 60–80%;E6 实践程度接近 +加分。**相似性加权,不做"互补"假设**——实证结论支持核心价值观相似优于互补(BRD 5.3.6)。
