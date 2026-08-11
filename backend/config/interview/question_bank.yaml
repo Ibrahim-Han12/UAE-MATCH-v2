@@ -1,6 +1,7 @@
 # =============================================================
 # UAE Match · 深访问法库
-# 版本: v0.2.0 | 日期: 2026-08-11 | 权威依据: PRD v1.1 §5.1/5.3.5(L2 层)
+# 版本: v0.3.0 | 日期: 2026-08-12 | 权威依据: PRD v1.1 §5.1/5.3.5(L2 层)
+# v0.3 变更(G1 裁决): 新增 A10 是否有子女(事实)条目,配合 Schema v0.3
 # v0.2 变更: elasticity_check 正式化为 post_step; A7 话术对齐 5 档; C4 补第二问法;
 #           新增 E2/E6 条目; 复合 ID 改 fields 列表; C5 弹性确认结果落 Schema per-item 字段
 # 用途: 深访编排器按字段缺口取问法建议,动态注入当轮上下文;
@@ -11,7 +12,7 @@
 # =============================================================
 
 meta:
-  version: 0.2.0
+  version: 0.3.0
   usage: "编排器每轮注入: 目标字段的 approaches(按 context_hint 择一) + probe 规则;LLM 现场组织语言"
   global_rules:
     max_probe_depth: 1              # 追问最多 1 层,答案仍模糊则标记 inferred/缺失,不逼问
@@ -84,6 +85,17 @@ question_bank:
         text: "你的签证是绑在公司身上的,还是自己独立的?——这关系到如果换工作,留下来这件事受不受影响。"
         context_hint: 用户聊到工作变动/跳槽想法时顺采
     probe: {trigger: none}
+
+  - field: A10   # 是否有子女(事实) 【高敏】
+    sensitivity_strategy: "自然挂接在 A3 婚史或 B3 子女计划语境之后,禁止孤立突问;离异/丧偶用户几乎必然预期此问,未婚用户通常一句带过;答案必须 stated,不接受推断"
+    approaches:
+      - style: post_marital_context
+        text: "之前的婚姻里有孩子吗?有的话,现在是跟着你在这边,还是在国内?"
+        context_hint: 首选;A3 为 divorced/widowed 时紧随婚史话题,一次采齐 count 与 living_arrangement
+      - style: bundled_with_plan
+        text: "聊子女计划前先确认一下现状——你目前有孩子吗?"
+        context_hint: A3 为 never_married 且语境自然时,B3 采集前顺带确认;未婚用户此问一句即过
+    probe: {trigger: "answer=yes 但未提随行状态", probe_text: "孩子现在是在你身边,还是在国内家里人带?", max_depth: 1}
 
   # ---------------- B 类 · 本地化维度(核心资产) ----------------
   - field: B1    # 去留规划

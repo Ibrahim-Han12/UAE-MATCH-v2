@@ -1,6 +1,7 @@
-# UAE Match · 匹配算法设计 v0.2
+# UAE Match · 匹配算法设计 v0.3
 
-> 权威依据:BR-306 / PRD 6.1(T-3 计算)/ BRD 5.3.6(心理框架分层)/ interview_schema.yaml v0.2
+> 权威依据:BR-306 / PRD 6.1(T-3 计算)/ BRD 5.3.6(心理框架分层)/ interview_schema.yaml v0.3
+> v0.3 变更(2026-08-12,G1 裁决):R5/R8 的"对方有孩"由推断改为引用 A10 has_children stated 事实字段;living_arrangement 进 Stage 2 计分
 > v0.2 变更(2026-08-12):合入产品裁决——Q1 异性匹配升格为 UAE 法域合规约束;Q2 阈值 70/65 起步确认(S2 第 4 周首次校准);Q3 热门用户周曝光上限=3 确认
 > 消费方:推荐流水线 T-3 阶段(HLD §7);推荐语生成(BR-302,引用 score breakdown)
 > 铁律:全部权重与阈值进 `config/matching_config.yaml`,业务代码零硬编码;
@@ -56,7 +57,7 @@
 - **R2 身高(C2)**:同上机制。
 - **R3 学历/收入门槛(C3)**:对方 A5/A7 达到门槛;negotiable 允许下探一档。
 - **R4 地域(C4 + B6)**:`same_emirate_only=true`(hard)时对方 A8.emirate 必须相同;跨酋长国场景校验双方 B6.cross_emirate;对方暂在国内场景校验 B6.partner_in_china_temp(单一事实源,Schema v0.2)。
-- **R5 免谈项(C5,per-item)**:逐条对方事实映射校验——smoking→E5.smoking≠never 触发;heavy_drinking→E5.drinking=regularly;divorced→A3∈{divorced};has_children→B3(对方有孩事实,v1 由 A3+访谈叙事推断,置信度低时不触发过滤只降分);gambling→仅访谈叙事有明确信号时触发;long_distance→由 R4 覆盖。`elasticity_value=hard` 过滤,`negotiable` 转计分减分。
+- **R5 免谈项(C5,per-item)**:逐条对方事实映射校验——smoking→E5.smoking≠never 触发;heavy_drinking→E5.drinking=regularly;divorced→A3∈{divorced};has_children→A10.has=yes(stated 事实字段,v0.3 起,不再依赖推断);gambling→仅访谈叙事有明确信号时触发;long_distance→由 R4 覆盖。`elasticity_value=hard` 过滤,`negotiable` 转计分减分。
 - **R6 去留规划(B1,硬约束级,BR-306)**:冲突矩阵——
   | | long_term_stay | return_within_years | depends_on_marriage | undecided |
   |---|---|---|---|---|
@@ -65,7 +66,7 @@
   | depends_on_marriage | ✅ | ✅ | ✅ | ✅ |
   | undecided | ⚠️ | ⚠️ | ✅ | ⚠️ |
 - **R7 结婚时间线(B2)**:档位差 ≥3(within_1y × no_rush)→ 过滤;差 =2 → 通过但计分强降(§4.1)。依据 BRD 3.3"差距 >2 档提示预期错位",此处将"提示"落为分级处置。
-- **R8 子女计划(B3)**:want=yes × want=no → 过滤;yes × open_to_discuss → 通过计分;对方有孩 × accept_partner_with_children=no → 过滤(事实置信度 stated 时)。
+- **R8 子女计划(B3)**:want=yes × want=no → 过滤;yes × open_to_discuss → 通过计分;对方 A10.has=yes × accept_partner_with_children=no → 过滤(A10 为 stated 必采,无置信度豁免);living_arrangement 进入 Stage 2 计分(孩子随行 vs 国内 vs 成年独立,对接受方的现实差异)。
 - **R9 宗教约束(E6/B5.religion_constraint)**:仅当任一方明示约束(如 same_faith_only)且对方事实明确冲突时过滤;字段缺失不过滤(E 类不阻塞)。
 
 ## 4. Stage 2 规则计分(0–100,五维加权)

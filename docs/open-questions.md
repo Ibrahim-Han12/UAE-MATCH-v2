@@ -56,7 +56,7 @@
 
 | # | 发现 | 说明 | 建议 |
 |---|---|---|---|
-| C1-G1 | **"本人是否有孩子"事实字段缺失** | 算法 R5(免谈项 has_children)与 R8(对方有孩×accept=no→过滤)都需要"对方有孩"**事实**，但 Schema v0.2 只有 B3.accept_partner_with_children（**偏好**），没有 has_children 事实字段；算法文档自己也承认"v1 由 A3+访谈叙事推断，置信度低"。婚史(A3)推不出有无孩子 | Schema 增补 has_children 事实字段（注意：必采已 24/上限 25，加它正好顶格；或放 B3 对象内作子字段） |
+| C1-G1 | ✅ **已裁决并落地**（2026-08-12）：Schema v0.3 新增 **A10 has_children 事实字段**（has/count/living_arrangement，stated-only，必采 25 触顶——下一个必采须置换）；问法库 v0.3 配套 2 问法；算法 v0.3 的 R5/R8 改引 A10，living_arrangement 进 Stage 2 计分 | — | — |
 | C1-G2 | **尽责性差距规则未落** | BRD 5.3.6 匹配规则注入点明确列了"尽责性差距提示"，算法 v0.1 的心理维度只用了依恋矩阵+冲突风格+双高神经质 | 确认是 v1 有意精简（可接受）还是补进 4.2 |
 | C1-G3 | C4 同城要求的 negotiable 语义未定义 | 布尔字段没有"扩一档"概念 | 建议：negotiable=不过滤只减分（与 §4.5 一致） |
 | C1-G4 | R9 使用 B5.religion_constraint 与 Schema "B5 v1 不参与匹配"标记有张力 | B5 标 `matching_weight: none_v1`，但其宗教子项被 R9 消费 | 建议：华人池内宗教约束是合理例外，Schema B5 注释补一句豁免说明即可 |
