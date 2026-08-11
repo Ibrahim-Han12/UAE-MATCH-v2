@@ -28,6 +28,10 @@ class User(Base):
     # 手机验证时间（PRD 15 漏斗起点 phone_verified；OTP 验证即登录时写入）
     phone_verified_at = Column(DateTime(timezone=True), nullable=True)
 
+    # 注销冷静期（PRD 3.4 第四道防线）：非空=冷静期中（不进推荐池、7 天可撤销）
+    cancellation_requested_at = Column(DateTime(timezone=True), nullable=True)
+    cancel_reason_code = Column(String(50), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

@@ -50,6 +50,17 @@ def upsert_my_profile(
 
     # 只更新传入的字段（值为 None 的不动）
     update_data = profile_in.dict(exclude_unset=True)
+
+    # 年龄/性别锁定（BR-107）：EID 核验通过后自核验值带入，资料页不可改
+    from app.core.kyc import has_passed_kyc
+    if has_passed_kyc(db, current_user.id):
+        for locked_field in ("birth_year", "gender"):
+            if locked_field in update_data and update_data[locked_field] is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"code": "field_locked",
+                            "message": "年龄与性别已通过身份核验锁定，不可修改"},
+                )
     
     # 处理 extended_info：如果传入新的 extended_info，需要合并到现有的
     if 'extended_info' in update_data and update_data['extended_info'] is not None:

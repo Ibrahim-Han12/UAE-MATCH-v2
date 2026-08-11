@@ -12,3 +12,4 @@ from app.models.memory_vector import MemoryVector  # noqa: F401
 from app.models.memory_pending_change import MemoryPendingChange  # noqa: F401
 from app.models.user_state_transition import UserStateTransition  # noqa: F401
 from app.models.phone_otp import PhoneOtp  # noqa: F401
+from app.models.kyc_result import KycResult, BannedIdentity, AccountDeletionAudit  # noqa: F401
