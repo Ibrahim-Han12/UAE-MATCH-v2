@@ -33,7 +33,11 @@ FATIGUE_WORDS = ("嗯", "都行", "随便", "还好", "不知道", "哦")
 
 # 明确停止意愿（比疲劳信号更强）：命中即本轮收尾，绝不再问（PRD 5.1：节奏由用户掌控）
 STOP_PHRASES = ("不想聊", "不想回答", "不聊了", "不说了", "先到这里", "改天", "下次再",
-                "暂停", "停一下", "别问了", "跳过", "下一步", "下一个页面", "换个页面")
+                "暂停", "停一下", "别问了")
+
+# 前进意愿（与停止相反：用户想知道离下一步还差多远）——如实报缺口，不当作要停
+PROCEED_PHRASES = ("下一步", "下一个页面", "换个页面", "进入下一", "还差什么", "还差多少",
+                   "还要聊多久", "什么时候能", "进度怎么", "跳过")
 
 _CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
@@ -219,6 +223,7 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     # 3) 缺口与状态
     progress = compute_progress(db, user.id)
     stop_intent = any(p in message for p in STOP_PHRASES)
+    proceed_intent = (not stop_intent) and any(p in message for p in PROCEED_PHRASES)
     fatigue = detect_fatigue(history + [type("M", (), {"role": "user", "content": message})()])
     session_turns = sum(1 for h in history if h.role == "user") + 1
     wrap_up = stop_intent or fatigue or session_turns >= SESSION_SOFT_CAP_TURNS
@@ -236,6 +241,19 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
 
     if completed:
         instruction = "【收尾指令】必采信息已全部完成。感谢用户的坦诚，告诉用户：画像报告正在生成、下一步是身份核验。语气要有仪式感。"
+    elif proceed_intent:
+        missing_labels = [
+            (ic.field_by_id(fid) or {}).get("label_zh", fid)
+            for fid in progress["missing_must"][:12]
+        ]
+        pct = round(progress["completion"] * 100)
+        instruction = (
+            f"【进度答复指令】用户想知道能否进入下一步。如实、具体地回答，禁止答非所问："
+            f"①当前我已经了解用户 {pct}%；②还需要聊的话题（用自然的话概括，不要报表单字段名）："
+            f"{('、'.join(missing_labels)) or '（无）'}；"
+            f"③说明这些聊完会自动进入下一步（身份核验），不需要用户手动跳转；"
+            f"④然后立刻自然地从缺口里挑一个话题继续问（单轮单问），保持推进的势头，不要让用户再问一次。"
+        )
     elif stop_intent:
         instruction = (
             "【收尾指令·用户明确要停】用户表达了不想继续/想离开的意愿。本轮绝对禁止再提任何问题。"
