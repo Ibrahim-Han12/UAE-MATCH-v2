@@ -276,10 +276,7 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     recent_text = "\n".join(
         f"{'用户' if h.role == 'user' else '小缘'}: {h.content}" for h in history[-4:]
     ) + f"\n用户: {message}"
-    scoped = acts.act_field_ids(current_act)
-    _idx = acts.ACTS.index(current_act)
-    if _idx > 0:
-        scoped = acts.act_field_ids(acts.ACTS[_idx - 1]) + scoped
+    scoped = acts.extraction_scope(current_act)
     try:
         extracted = extractor.extract_from_conversation(
             db, user.id, recent_text, field_ids=scoped)
@@ -324,6 +321,8 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
         progress = compute_progress(db, user.id, declined=declined)
 
     # 6) 组装本轮指令
+    expect_question = False          # 只有默认路径（注入了本轮建议）才要求提问
+    prev_reply = next((h.content for h in reversed(history) if h.role == "assistant"), None)
     system_prompt = _load_persona_prompt()
     memory_block = reader.build_profile_summary(db, user.id)
     if memory_block:
@@ -358,14 +357,20 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
             refusal_decision,
             ic.field_by_id(turn_intent.field_id) or {"id": turn_intent.field_id},
         )
-    elif turn_intent.kind in _INTENT_INSTRUCTIONS:
-        instruction = intent_instruction(turn_intent.kind)
     else:
+        # 反问／纠正／闲聊：先答用户，**再回到当前幕**（HLD §2 路由表）。
+        # 这三种意图必须"追加"而不是"替换"——否则 prompt 里没有目标字段与问法，
+        # 模型只能说"我没有具体问题要问你"（实测缺陷）。
+        parts = []
+        if turn_intent.kind in _INTENT_INSTRUCTIONS:
+            parts.append(intent_instruction(turn_intent.kind))
         if target is not None:
-            instruction = (act_instruction(current_act) + "\n"
-                           + _build_suggestion_block(db, user.id, target))
-        else:
-            instruction = "【本轮建议】剩余待采信息均为敏感项，但用户尚未授权敏感画像采集。自然地聊当前话题，并在合适时机说明授权的价值（不施压）。"
+            parts.append(act_instruction(current_act))
+            parts.append(_build_suggestion_block(db, user.id, target))
+        elif not parts:
+            parts.append("【本轮建议】剩余待采信息均为敏感项，但用户尚未授权敏感画像采集。自然地聊当前话题，并在合适时机说明授权的价值（不施压）。")
+        instruction = "\n".join(parts)
+        expect_question = target is not None
 
     messages = [{"role": "system", "content": system_prompt}]
     for h in history[-HISTORY_WINDOW:]:
@@ -390,7 +395,8 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
         stop_intent=stop_intent, completed=completed,
     )
     content, voice_result, voice_attempts = output_check.generate_checked(
-        _generate, scene=voice_scene)
+        _generate, scene=voice_scene, previous_reply=prev_reply,
+        expect_question=expect_question)
 
     _save_msg(db, user.id, "assistant", content,
               last.get("tokens_used", 0), last.get("model", ""))

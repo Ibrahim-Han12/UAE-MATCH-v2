@@ -60,3 +60,21 @@ def next_target(handled: Set[str], sensitive_ok: bool) -> Optional[dict]:
             continue
         return field
     return None
+
+
+def extraction_scope(act: str) -> List[str]:
+    """抽取契约的字段范围：当前幕 + 前后相邻幕（HLD §4 act-scoped targets）。
+
+    只取当前幕会丢跨幕答案——用户在 act1 就说出择偶条件是常态，实测中 C1/C2 因此
+    整段丢失，而小缘还回了"我记下来了"。每轮取全 Schema 又让 prompt 变长、命中散。
+    相邻幕是二者的平衡。
+    """
+    i = ACTS.index(act)
+    neighbours = ACTS[max(0, i - 1): i + 2]
+    seen, out = set(), []
+    for a in neighbours:
+        for fid in act_field_ids(a):
+            if fid not in seen:
+                seen.add(fid)
+                out.append(fid)
+    return out

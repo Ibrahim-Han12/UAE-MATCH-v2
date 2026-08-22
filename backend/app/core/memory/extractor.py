@@ -82,6 +82,11 @@ def _build_extraction_prompt(conversation_text: str, target_fields: List[dict]) 
     fields_block = "\n".join(lines)
     return f"""从以下对话中抽取用户信息。只抽取对话中确实出现的信息，未提及的字段一律不输出（禁止编造）。
 
+**宁缺勿猜**：用户没明确说的字段，直接省略，不要给"默认值"。尤其不许把
+undecided / unclear / na / 不确定 / 没想好 这类值当作抽取结果填进去——它们看着无害，
+但会被当成用户的真实回答喂进匹配算法的硬约束，比留空更糟。
+拿不准某个字段用户到底说没说，就当他没说。
+
 目标字段（以字段 ID 为键输出）：
 {fields_block}
 

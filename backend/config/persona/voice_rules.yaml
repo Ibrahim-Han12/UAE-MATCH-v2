@@ -23,7 +23,7 @@ scene_exemptions:
   # 进度答复：编排器要求如实报完成度百分比与缺口话题清单（会超长）
   progress: [progress_language, length]
   # 收尾：正反馈句允许略长
-  wrapup: [length]
+  wrapup: [length, missing_question, closing_phrases]
 
 groups:
   - id: honorific
@@ -54,7 +54,8 @@ groups:
   - id: system_voice
     type: hard
     mode: substring
-    patterns: ["已记录", "根据系统", "根据我的记录", "系统显示", "检测到"]
+    patterns: ["已记录", "根据系统", "根据我的记录", "系统显示", "检测到",
+               "我记下来了", "我记下了", "已为你记录", "帮你记下了"]
     reason: 暴露系统内部视角，破坏"像人一样记得"
 
   - id: report_tone
@@ -84,7 +85,9 @@ groups:
   - id: mechanical_transition
     type: hard
     mode: substring
+    mode_note: 句首裸「好的」用正则锚定开头，避免句中正常用法误报
     patterns: ["好的，那接下来", "好的,那接下来", "下一个问题", "接下来我们"]
+    regex_patterns: ['^\s*好的?[，,。！！]', '^\s*好[，,]']
     reason: act2 机械过渡句，表单感的主要来源
 
   - id: markdown
@@ -96,6 +99,25 @@ groups:
       - '\*\*'                    # 粗体
       - '(?m)^\s*#{1,6}\s'       # 标题
     reason: 聊天中禁止列表与富文本
+
+  # ---- HLD V1/V2/V3：三条结构性规则（非词表，由代码按 mode 判定）----
+  - id: missing_question
+    type: hard
+    mode: must_ask
+    reason: 无收尾指令时回复必须含提问（V1）——实测出现连续两轮不问问题，漏斗就此停住
+
+  - id: repeated_opening
+    type: hard
+    mode: no_repeat_opening
+    opening_chars: 8
+    reason: 开头与上一轮小缘回复相同 = 复读（V2）
+
+  - id: closing_phrases
+    type: hard
+    mode: substring
+    patterns: ["今天聊到这里", "今天先聊到这", "随时欢迎再来", "期待下次", "我们下次再聊",
+               "祝你有个愉快"]
+    reason: 无收尾指令却说结束语 = 自作主张收尾（V3）
 
   - id: progress_language
     type: review

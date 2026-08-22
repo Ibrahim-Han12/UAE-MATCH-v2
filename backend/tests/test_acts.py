@@ -56,3 +56,22 @@ def test_next_target_skips_high_sensitivity_without_consent():
     target = acts.next_target(act2_done, sensitive_ok=False)
 
     assert target is None or target.get("sensitivity") != "high"
+
+
+def test_extraction_scope_covers_adjacent_acts():
+    """抽取范围 = 当前幕 + 前后相邻幕。
+
+    只取当前幕会丢跨幕答案（实测：用户在 act1 就说了择偶条件，C1/C2 全丢）；
+    每轮取全 Schema 又让 prompt 变长、命中散。相邻幕是二者的平衡。
+    """
+    scope = acts.extraction_scope("act1")
+    assert "A4" in scope and "B1" in scope      # 当前幕
+    assert "C1" in scope and "C5" in scope      # 下一幕
+    assert "D1" not in scope                    # 隔一幕不进，控成本
+
+    scope2 = acts.extraction_scope("act2")
+    assert "A4" in scope2 and "C1" in scope2 and "D1" in scope2   # 前后都在
+
+    scope3 = acts.extraction_scope("act3")
+    assert "C1" in scope3 and "D1" in scope3
+    assert "A4" not in scope3

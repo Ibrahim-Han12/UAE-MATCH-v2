@@ -87,7 +87,9 @@ def test_shipped_crisis_copy_is_itself_clean():
 
     result = oc.check(conf["fixed_response"].strip())
 
-    assert result.violations == [], f"危机话术命中禁用规则：{result.violations}"
+    # 只守词表与结构性腔调；危机话术本就不提问、也允许长，那两组不适用
+    relevant = [v for v in result.violations if v.group not in ("length", "missing_question")]
+    assert relevant == [], f"危机话术命中禁用规则：{relevant}"
 
 
 def test_regenerate_only_once_and_only_for_hard():
@@ -155,3 +157,85 @@ def test_scene_mapping_from_orchestrator_flags():
     assert oc.scene_for() == "interview"
     # 进度答复优先级高于收尾：用户问"还差多少"时不能被当成要收尾
     assert oc.scene_for(proceed_intent=True, wrap_up=True) == "progress"
+
+
+def test_v1_two_consecutive_turns_without_question_is_hard_violation():
+    """V1：本轮要求提问、却连着两轮都不问 = 漏斗停住（实测缺陷）。"""
+    result = oc.check("好，我知道了。有其他想法随时告诉我。",
+                      previous_reply="我没有具体问题要问你。聊聊你的期待就好。",
+                      expect_question=True)
+
+    assert "missing_question" in [v.group for v in result.violations]
+    assert result.has_hard is True
+
+
+def test_v1_allows_a_single_empathy_only_turn():
+    """验收 #3 明确要求 5 轮内至少 1 轮只共情不提问——单独一轮不算违规。"""
+    result = oc.check("外派五年，朋友圈换了一茬又一茬，能踏实说话的没几个——是这种感觉吧。",
+                      previous_reply="说说你心里那个人吧。年龄上什么区间你觉得舒服？",
+                      expect_question=True)
+
+    assert "missing_question" not in [v.group for v in result.violations]
+
+
+def test_v1_not_applied_when_turn_does_not_expect_a_question():
+    """拒答翻篇、地板线说明、收尾等轮次本就不该提问，默认不检。"""
+    result = oc.check("这题不方便就跳过，不影响什么。",
+                      previous_reply="收入这块不想说也没关系。")
+
+    assert "missing_question" not in [v.group for v in result.violations]
+
+
+def test_v1_satisfied_by_either_question_mark():
+    for text in ("身高呢？说个底线就行。", "身高呢? 说个底线就行。"):
+        result = oc.check(text, previous_reply="没有问号的上一轮。", expect_question=True)
+        assert "missing_question" not in [v.group for v in result.violations]
+
+
+def test_v2_repeated_opening_is_hard_violation():
+    """V2：开头与上一轮相同 = 复读（真人测试 round 1 的缺陷）。"""
+    prev = "说说你心里那个人吧。年龄上，什么区间你觉得舒服？"
+    now = "说说你心里那个人吧。学历上有什么想法？"
+
+    result = oc.check(now, previous_reply=prev)
+
+    assert "repeated_opening" in [v.group for v in result.violations]
+
+
+def test_v2_allows_different_opening():
+    prev = "说说你心里那个人吧。年龄上，什么区间你觉得舒服？"
+    now = "三十到三十五，挺实在的区间。身高呢？"
+
+    result = oc.check(now, previous_reply=prev)
+
+    assert "repeated_opening" not in [v.group for v in result.violations]
+
+
+def test_v3_closing_phrase_without_wrapup_is_hard_violation():
+    """V3：没有收尾指令却说结束语 = 自作主张收尾（commit 4603cce 修过的缺陷类）。"""
+    result = oc.check("今天聊到这里吧，随时欢迎再来。")
+
+    assert "closing_phrases" in [v.group for v in result.violations]
+
+
+def test_v3_closing_phrase_allowed_in_wrapup_scene():
+    result = oc.check("今天聊到这里，剩下的我们边处边聊。", scene="wrapup")
+
+    assert "closing_phrases" not in [v.group for v in result.violations]
+
+
+def test_recorded_it_phrasing_is_caught():
+    """实测漏网：小缘说"我记下来了"，语义等同"已记录"，但词表只有后者。
+
+    更糟的是那次它说了这句而数据库其实是空的——系统腔 + 假承诺。
+    """
+    result = oc.check("好，我记下来了：你希望找 28 到 32 岁的。还有其他要求吗？")
+
+    assert "system_voice" in [v.group for v in result.violations]
+
+
+def test_bare_ok_opener_is_caught():
+    """实测漏网：句首裸「好的」，词表只有「好的，那接下来」。"""
+    result = oc.check("好的，你的年龄区间我知道了。身高呢？")
+
+    assert "mechanical_transition" in [v.group for v in result.violations]

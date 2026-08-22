@@ -171,3 +171,79 @@ def test_terse_refusal_is_still_accounted_when_fatigue_wraps_up(monkeypatch, db,
     st = dstate.get_or_create(db, user.id)
     assert dstate.refusal_count(st, "A9") == 3, "疲劳收尾期间拒答未被记账"
     assert "A9" in dstate.declined_set(st), "重试一次后仍拒，应已标 declined"
+
+
+def test_ask_ai_still_carries_the_next_question(monkeypatch, db, user):
+    """反问不能吃掉下一个问题。
+
+    实测缺陷：用户问"你想知道什么"被分类为 ask_ai，而该分支替换掉了幕指令与本轮建议，
+    prompt 里没有目标字段也没有问法 —— 模型只能如实说"我没有具体问题要问你"。
+    HLD §2 的路由是"先答用户的问题，**再回到当前幕**"，回到当前幕要求幕目标仍在。
+    """
+    gw = RecordingGateway(intent_kind="ask_ai")
+    _install(monkeypatch, gw)
+
+    orchestrator.handle_message(db, user, "你想知道什么", sensitive_ok=True)
+
+    prompt = gw.generation_prompt()
+    assert "【反问指令】" in prompt          # 先答他
+    assert "【本幕模式" in prompt            # 再回到当前幕
+    assert "【本轮建议】" in prompt          # 且带着具体目标字段与问法
+    # 顺序：先答问题，再回到幕
+    assert prompt.index("【反问指令】") < prompt.index("【本轮建议】")
+
+
+def test_correction_and_smalltalk_also_carry_the_next_question(monkeypatch, db, user):
+    for kind, marker in (("correction", "【纠正指令】"), ("smalltalk", "【闲聊指令】")):
+        gw = RecordingGateway(intent_kind=kind)
+        _install(monkeypatch, gw)
+
+        orchestrator.handle_message(db, user, "顺便说一句，我其实住阿布扎比", sensitive_ok=True)
+
+        prompt = gw.generation_prompt()
+        assert marker in prompt, kind
+        assert "【本轮建议】" in prompt, f"{kind} 分支丢了下一个问题"
+
+
+def test_extraction_covers_adjacent_acts_not_just_current(monkeypatch, db, user):
+    """跨幕答案不能丢。
+
+    实测缺陷：用户在 act1 就说了"年龄 28-32、身高 160-170"（C1/C2，属 act2），
+    抽取被限定在 act1 → 数据库里 C1/C2 全空，而小缘回了"我记下来了"。
+    HLD §3 明确要求"用户跑题聊到其他幕字段照常顺势采集"。
+    """
+    gw = RecordingGateway(intent_kind="answer")
+    _install(monkeypatch, gw)
+
+    orchestrator.handle_message(db, user, "我想找 28 到 32 岁、身高 160 到 170 的", sensitive_ok=True)
+
+    extraction = [m for t, ms in gw.calls if t == "memory_extraction" for m in ms]
+    contract = "\n".join(m["content"] for m in extraction)
+    assert "C1 (" in contract, "act1 轮次的抽取契约必须能接住 act2 的 C1"
+    assert "C2 (" in contract, "act1 轮次的抽取契约必须能接住 act2 的 C2"
+
+
+class NoQuestionGateway(RecordingGateway):
+    """生成永远不带问号，用来验证 V1 会触发重生成。"""
+
+    def chat(self, db, *, user_id, task, messages, **kw):
+        r = super().chat(db, user_id=user_id, task=task, messages=messages, **kw)
+        if task == "deep_interview":
+            # 只缺问号，不含任何其他违规（避免第一轮就因别的规则重生成）
+            r["content"] = "这些我先放在心里，慢慢来，不着急。"
+        return r
+
+
+def test_v1_triggers_regeneration_when_two_turns_lack_a_question(monkeypatch, db, user):
+    """连着两轮不提问必须触发重生成（V1 接线验证）。"""
+    gw = NoQuestionGateway(intent_kind="answer")
+    _install(monkeypatch, gw)
+
+    orchestrator.handle_message(db, user, "我来迪拜六年了", sensitive_ok=True)
+    gens_turn1 = len([t for t, _ in gw.calls if t == "deep_interview"])
+
+    orchestrator.handle_message(db, user, "在 DIFC 做 audit", sensitive_ok=True)
+    gens_total = len([t for t, _ in gw.calls if t == "deep_interview"])
+
+    assert gens_turn1 == 1, "第一轮没有上一轮可比，不该重生成"
+    assert gens_total == 3, "第二轮应重生成一次（1 + 2 = 3 次生成调用）"

@@ -27,3 +27,17 @@ def test_non_d_class_field_gets_no_rubric():
     prompt = extractor._build_extraction_prompt("用户: 月薪三万多", [a7])
 
     assert "行为编码" not in prompt
+
+
+def test_extraction_prompt_forbids_inferring_unmentioned_fields():
+    """实测缺陷：用户从没提去留规划，库里却写了 B1=undecided。
+
+    「未提及不输出」原本只在开头说了一句，模型仍然推断了。必须点名最容易被推断的
+    形态：不确定、没想好、undecided 这类"看起来无害"的默认值——它们会直接污染
+    匹配算法的硬约束（B1 喂 R6 去留冲突过滤）。
+    """
+    b1 = ic.field_by_id("B1")
+    prompt = extractor._build_extraction_prompt("用户: 我在迪拜做金融，硕士毕业", [b1])
+
+    assert "宁缺勿猜" in prompt
+    assert "undecided" in prompt          # 点名这类默认值不许当抽取结果
