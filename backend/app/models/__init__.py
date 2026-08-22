@@ -16,3 +16,4 @@ from app.models.kyc_result import KycResult, BannedIdentity, AccountDeletionAudi
 from app.models.profile_report import ProfileReport, UserConsent  # noqa: F401
 from app.models.reco_pair import RecoPair, Notification  # noqa: F401
 from app.models.stripe_event import StripeEvent  # noqa: F401
+from app.models.interview_state import InterviewState  # noqa: F401
