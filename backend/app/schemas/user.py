@@ -21,6 +21,7 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
     is_active: bool
+    is_admin: bool = False       # 前端据此显示照片审核台入口（DEC-002 种子期人工核验）
     status: str
     created_at: datetime
 

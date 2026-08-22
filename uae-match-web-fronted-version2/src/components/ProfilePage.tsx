@@ -9,6 +9,8 @@ import {
   Crown,
   ChevronRight,
 } from "lucide-react";
+import { t } from "../i18n";
+import { PhotoManager } from "./PhotoManager";
 
 interface ProfilePageProps {
   user: any;
@@ -121,6 +123,13 @@ export function ProfilePage({
           </div>
         </div>
 
+        {/* 照片管理：过审后仍要能换主图、删旧照、补新照（BR-101/102） */}
+        <div className="p-4">
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <PhotoManager />
+          </div>
+        </div>
+
         {/* 菜单选项 */}
         <div className="p-4 space-y-3">
           <div className="bg-white rounded-xl overflow-hidden border border-gray-200">
@@ -167,6 +176,18 @@ export function ProfilePage({
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
             </button>
           </div>
+
+          {user?.is_admin && (
+
+            <a href="#admin-photos"
+
+               className="block w-full text-center py-3 rounded-xl bg-white border border-gray-200 text-sm text-gray-700 mb-3">
+
+              {t('adminPhotos.title')}
+
+            </a>
+
+          )}
 
           <button
             onClick={onLogout}

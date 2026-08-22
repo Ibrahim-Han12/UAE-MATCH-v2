@@ -219,7 +219,7 @@ export const profileApi = {
       city: profile.current_city,
       occupation: profile.occupation,
       bio: profile.bio,
-      avatar: profile.avatar_url || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&h=400&fit=crop`,
+      avatar: profile.avatar_url || null,
       extended_info: profile.extended_info || {},
     };
   },
@@ -378,7 +378,7 @@ export const matchesApi = {
       name: item.nickname || item.profile?.display_name || '用户',
       age: birthYearToAge(item.profile?.birth_year) || 25,
       verified: true, // TODO: 从后端获取认证状态
-      avatar: item.profile?.avatar_url || `https://images.unsplash.com/photo-${1580000000000 + item.user_id}?w=400&h=400&fit=crop`,
+      avatar: item.profile?.avatar_url || null,
       bio: item.bio || item.profile?.bio || '',
       location: item.city || item.profile?.current_city || 'Dubai',
       occupation: item.profile?.occupation || '',
@@ -421,7 +421,7 @@ export const matchesApi = {
       name: match.other_nickname || match.other_user_profile?.display_name || '用户',
       age: birthYearToAge(match.other_user_profile?.birth_year) || 25,
       verified: true,
-      avatar: match.other_user_profile?.avatar_url || `https://images.unsplash.com/photo-${1580000000000 + match.other_user_id}?w=400&h=400&fit=crop`,
+      avatar: match.other_user_profile?.avatar_url || null,
       occupation: match.other_user_profile?.occupation || '',
       location: match.other_user_profile?.current_city || 'Dubai',
       matchScore: 85, // TODO: 从后端获取
@@ -544,6 +544,71 @@ export const interviewApi = {
   },
   async getHistory(limit = 50) {
     return apiFetch<any[]>(`/ai-chat/history?conversation_type=interview&limit=${limit}`);
+  },
+};
+
+/**
+ * 把后端返回的相对图片路径（如 /api/v1/photos/file/x.jpg）解析成可加载的绝对地址。
+ * 前端与后端不同源（3000 vs 8000），直接用相对路径会打到前端 dev server 上 404。
+ */
+export function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+  const origin = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+  return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+export type Photo = {
+  id: number;
+  file_url: string;
+  file_name: string | null;
+  display_order: number;
+  is_primary: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  rejection_reason: string | null;
+  created_at: string;
+};
+
+/** 资料照片（BR-101/102：上传 → 人工过审 → 才可展示） */
+export const photosApi = {
+  async mine() {
+    return apiFetch<Photo[]>('/photos/me');
+  },
+  async upload(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return apiFetch<{ photo: Photo; message: string }>('/photos/upload', {
+      method: 'POST', body: form });
+  },
+  async setPrimary(photoId: number) {
+    return apiFetch<Photo>(`/photos/${photoId}`, {
+      method: 'PUT', body: JSON.stringify({ is_primary: true }) });
+  },
+  async remove(photoId: number) {
+    return apiFetch<any>(`/photos/${photoId}`, { method: 'DELETE' });
+  },
+};
+
+export type PhotoReviewItem = {
+  id: number;
+  user_id: number;
+  file_url: string;
+  file_name: string | null;
+  is_primary: boolean;
+  created_at: string;
+  declared_gender: string | null;
+  declared_age: number | null;
+};
+
+/** 照片人工审核台（DEC-002：种子期人工核验，仅 is_admin 可见） */
+export const adminPhotosApi = {
+  async queue() {
+    return apiFetch<{ count: number; items: PhotoReviewItem[] }>('/admin/photos/queue');
+  },
+  async review(photoId: number, action: 'approve' | 'reject', reason?: string) {
+    return apiFetch<{ status: string; promoted: boolean }>(
+      `/admin/photos/${photoId}/review`,
+      { method: 'POST', body: JSON.stringify({ action, reason }) });
   },
 };
 

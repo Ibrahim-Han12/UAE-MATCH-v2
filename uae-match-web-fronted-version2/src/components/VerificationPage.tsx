@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { ShieldCheck, CheckCircle2, Circle } from 'lucide-react';
 import { verificationApi, ApiError } from '../lib/api';
 import { t } from '../i18n';
+import { PhotoManager } from './PhotoManager';
+import { type Photo } from '../lib/api';
 
 interface VerificationPageProps {
   onVerified: () => void;
@@ -13,6 +15,7 @@ interface VerificationPageProps {
 
 export function VerificationPage({ onVerified }: VerificationPageProps) {
   const [status, setStatus] = useState<{ kyc_passed: boolean; photo_approved: boolean; phone_verified: boolean; state: string } | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,7 +89,19 @@ export function VerificationPage({ onVerified }: VerificationPageProps) {
           </button>
         )}
         {status && status.kyc_passed && !status.photo_approved && (
-          <p className="text-sm text-gray-500 text-center">{t('verification.waitingReview')}</p>
+          <div className="border-t border-gray-100 pt-5 mt-5">
+            <PhotoManager onChange={setPhotos} />
+            {photos.some((p) => p.status === 'pending') && (
+              <p className="text-sm text-amber-600 mt-3">
+                {t('verification.pendingCount').replace(
+                  '{n}', String(photos.filter((p) => p.status === 'pending').length))}
+                {' '}{t('photos.reviewNote')}
+              </p>
+            )}
+            {photos.length > 0 && photos.every((p) => p.status === 'rejected') && (
+              <p className="text-sm text-rose-500 mt-3">{t('verification.allRejected')}</p>
+            )}
+          </div>
         )}
         {error && <p className="text-sm text-red-500 mt-3">{error}</p>}
       </div>

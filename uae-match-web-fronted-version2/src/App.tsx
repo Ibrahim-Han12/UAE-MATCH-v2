@@ -12,6 +12,7 @@ import { PaywallPage } from './components/PaywallPage';
 import { MainApp } from './components/MainApp';
 import { isAuthenticated } from './lib/auth';
 import { meApi, authApi } from './lib/api';
+import { AdminPhotosPage } from './components/AdminPhotosPage';
 import { t } from './i18n';
 
 type Screen = 'landing' | 'login' | 'interview' | 'verification' | 'paywall' | 'main' | 'banned';
@@ -32,6 +33,13 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('landing');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // 审核台走 hash 路由：管理员可能处在任何状态，不该依赖已经进到主应用
+  const [hash, setHash] = useState(window.location.hash);
+  useEffect(() => {
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   /** 从后端拉状态机状态并导航（登录后 / 关键动作完成后调用） */
   const syncState = useCallback(async () => {
@@ -66,6 +74,10 @@ export default function App() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E07A5F]" />
       </div>
     );
+  }
+
+  if (hash === '#admin-photos' && currentUser?.is_admin) {
+    return <AdminPhotosPage onBack={() => { window.location.hash = ''; }} />;
   }
 
   switch (screen) {
