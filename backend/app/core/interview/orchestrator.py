@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core import state_machine as sm
 from app.core.ai import get_ai_gateway, Task
+from app.core.dialogue import output_check
 from app.core.interview import config as ic
 from app.core.interview import field_mapping
 from app.core.memory import extractor, reader
@@ -43,7 +44,7 @@ _CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 
 def _load_persona_prompt() -> str:
-    f = _CONFIG_DIR / "persona" / "interview_system_prompt.md"
+    f = _CONFIG_DIR / "persona" / "xiaoyuan.md"
     if f.exists():
         text = f.read_text(encoding="utf-8")
         # 去掉文件头的 HTML 注释（工程说明不进 prompt）
@@ -180,17 +181,34 @@ def start_interview(db: Session, user: User) -> Dict[str, Any]:
     if history:
         return {"message": None, "resumed": True, "progress": progress}
 
-    resp = get_ai_gateway().chat(
-        db, user_id=user.id, task=Task.DEEP_INTERVIEW,
-        messages=[
-            {"role": "system", "content": _load_persona_prompt()},
-            {"role": "user", "content": "【系统指令】这是与该用户的第一次见面。请按'价值先行'原则开场：介绍你是谁、你怎么工作、节奏由用户掌控。本轮不提任何采集问题。"},
-        ],
-        scene="interview", temperature=0.8,
-    )
-    _save_msg(db, user.id, "assistant", resp["content"], resp["tokens_used"], resp["model"])
+    base = [
+        {"role": "system", "content": _load_persona_prompt()},
+        {"role": "user", "content": "【系统指令】这是与该用户的第一次见面。请按'价值先行'原则开场：介绍你是谁、你怎么工作、节奏由用户掌控。本轮不提任何采集问题。"},
+    ]
+    last: Dict[str, Any] = {}
+
+    def _generate(hint: Optional[str]) -> str:
+        msgs = base if hint is None else base + [{"role": "system", "content": hint}]
+        r = get_ai_gateway().chat(
+            db, user_id=user.id, task=Task.DEEP_INTERVIEW,
+            messages=msgs, scene="interview", temperature=0.8,
+        )
+        last.update(r)
+        return r["content"]
+
+    # 开场是"您好！我是您的专属AI红娘"这类客服腔的高发处，必须过语气闸
+    content, voice_result, voice_attempts = output_check.generate_checked(
+        _generate, scene="interview")
+    _save_msg(db, user.id, "assistant", content,
+              last.get("tokens_used", 0), last.get("model", ""))
     log_event(db, user_id=user.id, event_type="interview_started", metadata={})
-    return {"message": resp["content"], "resumed": False, "progress": progress}
+    if voice_result.violations:
+        log_event(db, user_id=user.id, event_type="quality_event",
+                  metadata={"scene": "interview_opening", "attempts": voice_attempts,
+                            "violations": [{"group": v.group, "type": v.type,
+                                            "pattern": v.pattern}
+                                           for v in voice_result.violations]})
+    return {"message": content, "resumed": False, "progress": progress}
 
 
 def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) -> Dict[str, Any]:
@@ -275,11 +293,34 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     messages.append({"role": "user", "content": message})
     messages.append({"role": "system", "content": instruction})
 
-    resp = get_ai_gateway().chat(
-        db, user_id=user.id, task=Task.DEEP_INTERVIEW,
-        messages=messages, scene="interview", temperature=0.8,
+    # 5) 生成 + 语气闸（output_check）：hard 违规重生成一次并携带违规说明，仍违规则放行 + 埋点
+    last: Dict[str, Any] = {}
+
+    def _generate(hint: Optional[str]) -> str:
+        msgs = messages if hint is None else messages + [{"role": "system", "content": hint}]
+        r = get_ai_gateway().chat(
+            db, user_id=user.id, task=Task.DEEP_INTERVIEW,
+            messages=msgs, scene="interview", temperature=0.8,
+        )
+        last.update(r)
+        return r["content"]
+
+    voice_scene = output_check.scene_for(
+        proceed_intent=proceed_intent, wrap_up=wrap_up,
+        stop_intent=stop_intent, completed=completed,
     )
-    _save_msg(db, user.id, "assistant", resp["content"], resp["tokens_used"], resp["model"])
+    content, voice_result, voice_attempts = output_check.generate_checked(
+        _generate, scene=voice_scene)
+
+    _save_msg(db, user.id, "assistant", content,
+              last.get("tokens_used", 0), last.get("model", ""))
+
+    if voice_result.violations:
+        log_event(db, user_id=user.id, event_type="quality_event",
+                  metadata={"scene": voice_scene, "attempts": voice_attempts,
+                            "violations": [{"group": v.group, "type": v.type,
+                                            "pattern": v.pattern}
+                                           for v in voice_result.violations]})
 
     if fatigue:
         log_event(db, user_id=user.id, event_type="fatigue_triggered",
@@ -288,7 +329,7 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
         log_event(db, user_id=user.id, event_type="interview_paused",
                   metadata={"session_turns": session_turns})
 
-    return {"message": resp["content"], "progress": progress,
+    return {"message": content, "progress": progress,
             "completed": completed, "crisis": False}
 
 

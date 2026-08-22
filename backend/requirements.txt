@@ -11,3 +11,6 @@ openai>=1.0.0
 schedule>=1.2.0
 numpy>=1.24.0
 psycopg2-binary==2.9.9
+
+# 开发依赖：对话层输出校验与 Voice Guide 一致性测试（docs/persona-voice-guide.md）
+pytest==9.1.1

@@ -113,7 +113,7 @@
 | DEC-020 | C5 | 分层同意书 + 隐私政策/条款中英双语终稿 | ⏸ |
 
 > **"C3 槽位"这一说法一并废除**。它指的是"人格层的可替换资产位"，不是一个裁决号。
-> 改写为：**人格层资产（DEC-018）**。涉及 hld-dialogue-system.md §1/§7、interview_system_prompt.md 文件头。
+> 改写为：**人格层资产（DEC-018）**。涉及 hld-dialogue-system.md §1/§7、config/persona/xiaoyuan.md 文件头。
 
 ### 3.3 匹配算法与深访对账裁决
 
