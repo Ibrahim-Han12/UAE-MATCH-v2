@@ -1,12 +1,12 @@
 """
-账号注销（PRD 3.4 四道防线 / BR-004 / A5 裁决）。
+账号注销（PRD 3.4 四道防线 / BR-004 / DEC-005）。
 
 前两道（入口防误、毕业问询）在前端；本模块承接：
   第三道·双确认：二次 OTP + 手动输入"注销"（端点层校验）
   第四道·冷静期：7 天可撤销（冷静期中不进推荐池——匹配 Stage 0.7 读 cancellation_requested_at）
   到期执行：级联删除（画像/对话/向量记忆/照片/KYC 结论）+ 最小审计（A5：脱敏哈希+时间+原因码+KYC事务ID，留 12 个月）
 
-冲突裁决（HLD §4.3）：S7 封禁用户不可自助注销，仅申诉。
+冲突裁决（hld-m2-design.md §4.3）：S7 封禁用户不可自助注销，仅申诉。
 """
 import hashlib
 import os
@@ -70,7 +70,7 @@ def execute_cancellation(db: Session, user: User) -> None:
     """
     uid = user.id
 
-    # 审计记录先落（A5）
+    # 审计记录先落（DEC-005）
     last_kyc = (
         db.query(KycResult).filter_by(user_id=uid)
         .order_by(KycResult.created_at.desc()).first()

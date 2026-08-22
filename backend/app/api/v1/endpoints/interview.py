@@ -140,7 +140,7 @@ def get_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Any:
-    """最新画像报告（基础版免费，A4 裁决）。"""
+    """最新画像报告（基础版免费，DEC-004）。"""
     report = get_latest_report(db, current_user.id)
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="报告尚未生成")

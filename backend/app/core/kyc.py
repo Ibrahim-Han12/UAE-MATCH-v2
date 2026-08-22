@@ -1,5 +1,5 @@
 """
-EID 核验服务（BR-107 / HLD §9.2 / A2 裁决）。
+EID 核验服务（BR-107 / hld-m2-design.md §9.2 / DEC-002）。
 
 B1（KYC 服务商 Uqudo/IDWise 类）商务未定——按接口边界 + Mock 适配器实现：
 真实 SDK 接入 = 新增 Provider 实现（create_session + webhook 解析），业务流程不动。

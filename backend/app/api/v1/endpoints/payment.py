@@ -84,7 +84,7 @@ def create_order(
     """
     创建订单
     【已冻结】道具变现冻结（BR-503）：super_like/boost/who_liked_me 返回 410；
-    旧人民币订阅 SKU 一并下线，订阅走 /subscription/*（AED，⑥）。
+    旧人民币订阅 SKU 一并下线，订阅走 /subscription/*（AED，BR-501）。
     表与历史订单保留，本端点仅冻结新购。
     """
     frozen_props = ("super_like", "boost", "who_liked_me")

@@ -1,8 +1,8 @@
 """
-记忆读取原语（BR-202 / HLD §5.3 读管线）。
+记忆读取原语（BR-202 / hld-m2-design.md §5.3 读管线）。
 
 小缘每轮注入 = 系统 prompt(人格) + 结构化画像摘要(build_profile_summary)
-             + 向量检索 top-3 相关记忆(retrieve_memories, CLAUDE §4 成本纪律)。
+             + 向量检索 top-3 相关记忆(retrieve_memories, PRD 5.6 成本纪律)。
 
 D2 决策：应用层余弦（向量 JSON 列存，内存 Top-K），v1 量级不设向量索引。
 """
@@ -19,7 +19,7 @@ from app.models.user_comm_profile import UserCommProfile
 from app.models.memory_event import MemoryEvent
 from app.models.memory_vector import MemoryVector
 
-TOP_K = 3  # 记忆注入 top-3（CLAUDE §4）
+TOP_K = 3  # 记忆注入 top-3（PRD 5.6.1 / BR-209）
 
 
 def retrieve_memories(

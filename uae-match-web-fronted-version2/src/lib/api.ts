@@ -584,7 +584,7 @@ export const subscriptionApi = {
   },
 };
 
-/** 推荐信（BR-301/303） */
+/** 推荐信（BR-301, BR-303） */
 export const recommendationApi = {
   async list() {
     return apiFetch<any>('/recommendations');

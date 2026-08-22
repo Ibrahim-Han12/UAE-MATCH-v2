@@ -1,5 +1,5 @@
 """
-AED 订阅端点（⑥，BR-501 / PRD 8 / A1 裁决）。
+AED 订阅端点（BR-501 / PRD 8 / DEC-001）。
 
 /subscription/products —— 目录（标准可买；高级"即将开放"不可买；尊享席位余量真实）
 /subscription/checkout —— 创建支付会话（S3 前置：三道闸顺序）

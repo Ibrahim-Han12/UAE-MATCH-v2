@@ -198,7 +198,7 @@ def _check_one_direction(cfg: dict, me: Candidate, other: Candidate) -> Directio
                 r.rules.append("C3:income_filtered")
                 return r
 
-    # R4 地域（G3：布尔 negotiable=不过滤记-3）
+    # R4 地域（DEC-023：布尔 negotiable=不过滤记-3）
     if pref.same_emirate_only:
         same = (me.profile.residence_emirate and
                 me.profile.residence_emirate == other.profile.residence_emirate)
@@ -361,7 +361,7 @@ def _score_psych(cfg: dict, a: Candidate, b: Candidate, rules: List[str]) -> Tup
         if pa.big_five_neuroticism > th and pb.big_five_neuroticism > th:
             score *= c["neuroticism_double_high_factor"]
             rules.append("E1:double_high_neuroticism")
-    # 尽责性差距（G2）
+    # 尽责性差距（DEC-022）
     if pa and pb and pa.big_five_conscientiousness is not None and pb.big_five_conscientiousness is not None:
         if abs(pa.big_five_conscientiousness - pb.big_five_conscientiousness) > c["conscientiousness_gap_threshold"]:
             score *= c["conscientiousness_gap_factor"]

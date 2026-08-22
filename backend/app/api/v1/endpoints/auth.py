@@ -159,7 +159,7 @@ def read_me(current_user: User = Depends(get_current_active_user)) -> Any:
     return current_user
 
 
-# ============ 手机 OTP：主登录路径（BR-001/108，验证即登录） ============
+# ============ 手机 OTP：主登录路径（BR-001, BR-108，验证即登录） ============
 
 class OtpRequestIn(BaseModel):
     phone: str

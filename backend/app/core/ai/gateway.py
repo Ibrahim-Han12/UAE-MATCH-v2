@@ -1,5 +1,5 @@
 """
-AI 网关（模型抽象层门面，CLAUDE §4）。
+AI 网关（模型抽象层门面，PRD 5.6.4 / BR-209）。
 
 业务代码调用 gateway.chat(task=...) / gateway.embed(...)，网关负责：
 1. 按 task 解析模型档位（routing）——业务代码不碰模型名；

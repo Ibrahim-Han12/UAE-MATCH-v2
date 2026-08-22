@@ -8,7 +8,7 @@ class UserPsychProfile(Base):
     事实层 · 心理测评区块（BR-202 三层记忆之一；PRD 5.3.6）。
     与 user_profiles / match_preferences 一起构成"结构化画像库"的事实层。
     仅用高效度框架：大五 + 依恋 + 冲突风格 + 金钱观 + 价值观向量；MBTI 仅映射入库。
-    评分/权重规则属《匹配算法设计》(C1)，本表只承载结构。
+    评分/权重规则属《匹配算法设计》(DEC-016)，本表只承载结构。
     """
     __tablename__ = "user_psych_profile"
 

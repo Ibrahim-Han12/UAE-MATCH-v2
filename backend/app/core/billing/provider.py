@@ -1,5 +1,5 @@
 """
-支付供应商适配器（HLD §9.1 集成边界：平台不碰卡号，全托管 Stripe）。
+支付供应商适配器（hld-m2-design.md §9.1 集成边界：平台不碰卡号，全托管 Stripe）。
 
 MockStripeProvider：开发用——生成假 checkout 会话，配合
 POST /subscription/dev/mock-pay 模拟支付完成回调。

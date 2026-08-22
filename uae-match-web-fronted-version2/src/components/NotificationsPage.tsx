@@ -1,5 +1,5 @@
 /**
- * 通知中心（站内信必达底座的用户端，HLD §8）。
+ * 通知中心（站内信必达底座的用户端，hld-m2-design.md §8）。
  */
 import { useEffect, useState } from 'react';
 import { Bell, CheckCheck } from 'lucide-react';

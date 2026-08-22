@@ -1,13 +1,13 @@
 """
 深访/对话抽取器（BR-201 双产物之"内部画像"入口；Schema 驱动）。
 
-流程（HLD §5.3 写管线）：
+流程（hld-m2-design.md §5.3 写管线）：
   对话文本 → LLM 按 Schema 字段契约抽取 JSON → 枚举校验 → 路由落库：
     D 类 + E1/E2        → user_psych_profile（事实层·心理测评）
     G1/G2/G3            → user_comm_profile（情感层·结构化）
     F3 感情叙事          → memory_vectors(namespace=narrative)（仅向量，不进结构化字段）
     A/B/C 类            → 暂存 memory_events(interview_extract)——user_profiles/
-                          match_preferences 的字段扩展属 ③/④，扩展后由资料模块消费
+                          match_preferences 的字段扩展属 BR-001 账户层 / BR-201 深访范围，扩展后由资料模块消费
   全程记录置信度（stated/inferred，Schema G5）。
 
 抽取走 Task.MEMORY_EXTRACTION（mini 档）、不占用户配额（系统侧）。

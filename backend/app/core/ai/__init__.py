@@ -1,5 +1,5 @@
 """
-AI 模型抽象层（CLAUDE §4 / BR-209）。
+AI 模型抽象层（PRD 5.6.4 / BR-209）。
 
 对外入口：
     from app.core.ai import get_ai_gateway, Task

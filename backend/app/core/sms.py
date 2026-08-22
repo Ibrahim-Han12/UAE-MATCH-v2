@@ -1,5 +1,5 @@
 """
-短信通道适配器（BR-001/108）。
+短信通道适配器（BR-001, BR-108）。
 
 B2（SMS 供应商）商务未定——先以接口边界 + Mock 适配器实现（open-questions B 节约定），
 供应商确定后新增一个 Provider 实现并改 settings.SMS_PROVIDER 即可，业务代码不动。

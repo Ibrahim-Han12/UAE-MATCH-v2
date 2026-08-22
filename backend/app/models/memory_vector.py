@@ -5,12 +5,12 @@ from app.db.session import Base
 
 class MemoryVector(Base):
     """
-    向量记忆库（BR-202 双轨之一；D7=同库不同 namespace）。
+    向量记忆库（BR-202 双轨之一；DEC-010：同库不同 namespace）。
     画像向量与情感/叙事记忆向量共表，用 namespace 区分：
       profile   —— 价值观/画像语义向量
       emotion   —— 情感记忆
       narrative —— 原话叙事（PRD Schema F3，仅入向量、不进结构化字段）
-    D2=应用层余弦：向量以 JSON 列存，检索时载入内存算 Top-K（<数千用户足够，不上 pgvector）。
+    DEC-007 应用层余弦：向量以 JSON 列存，检索时载入内存算 Top-K（<数千用户足够，不上 pgvector）。
     """
     __tablename__ = "memory_vectors"
 

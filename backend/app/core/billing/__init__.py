@@ -1,5 +1,5 @@
 """
-订阅计费（⑥，BR-501/502/503）。
+订阅计费（BR-501, BR-502, BR-503）。
 
 catalog  —— config/products.yaml 商品目录（价格唯一来源）
 provider —— 支付通道适配器（mock / stripe 骨架，平台不碰卡号）

@@ -77,7 +77,7 @@ class Subscription(Base):
 
     # 自动续费
     auto_renew = Column(Boolean, default=True, nullable=False)  # 是否自动续费
-    # ===== Stripe 集成（⑥，B5 主体就位后启用真实通道）=====
+    # ===== Stripe 集成（BR-501，公司主体就位后启用真实通道）=====
     stripe_customer_id = Column(String(64), nullable=True)
     stripe_subscription_id = Column(String(64), nullable=True)
     grace_until = Column(DateTime(timezone=True), nullable=True)  # 支付失败宽限期（7天）

@@ -2,7 +2,7 @@
 # UAE Match · 深访信息目标 Schema
 # 版本: v0.3.1 | 日期: 2026-08-11 | 权威依据: PRD v1.1 §5.2
 # v0.2 变更: C5 改 per-item 弹性; C4 移除 accept_remote_china(由 B6 派生); A7 口径对齐问法库
-# v0.3 变更(G1 裁决): 新增 A10 has_children 事实字段——修复"偏好侧存在(B3)而事实侧缺失"的缺口;
+# v0.3 变更(DEC-021): 新增 A10 has_children 事实字段——修复"偏好侧存在(B3)而事实侧缺失"的缺口;
 #                     必采 24→25,触顶治理上限,下一个必采字段须置换
 # 用途: 深访编排器的验收标准(逐轮对账字段缺口)、抽取模块的落库契约、
 #       画像库建表依据、完成度计算(仅计 A-D 类)
@@ -32,7 +32,7 @@ meta:
 
 fields:
 
-  # ============ A. 硬性信息(9 项,必采;A1/A2/A3 系统带入) ============
+  # ============ A. 硬性信息(10 项,必采;A1/A2/A3 系统带入) ============
   - id: A1
     key: birth_date
     label_zh: 出生日期/年龄
@@ -148,7 +148,7 @@ fields:
       living_arrangement: {type: enum, enum: [with_me_in_uae, in_china_with_family, adult_independent], when: yes}
     sensitivity: high
     confidence_required: true        # 必须 stated;该字段是 C5(has_children 免谈项)与 B3.accept_partner_with_children 的事实校验源
-    notes: "v0.3 新增(G1):偏好侧 B3 已有、事实侧缺失的修复;匹配规则 R5/R8 由“推断”改为引用本字段 stated 值"
+    notes: "v0.3 新增(DEC-021):偏好侧 B3 已有、事实侧缺失的修复;匹配规则 R5/R8 由“推断”改为引用本字段 stated 值"
 
   # ============ B. 本地化维度(6 项,必采,核心数据资产) ============
   - id: B1
@@ -216,7 +216,7 @@ fields:
       language_requirement: {type: enum, enum: [mandarin_required, english_ok, any], required: false}
     sensitivity: high
     matching_weight: none_v1        # v1 仅采集不参与匹配;Phase 2 启用(BRD 2.5)
-    # 豁免(G4 裁决,v0.3.1): 仅 religion_constraint 子项供匹配规则 R9 过滤消费——
+    # 豁免(DEC-024,v0.3.1): 仅 religion_constraint 子项供匹配规则 R9 过滤消费——
     # 宗教约束在纯华人池内亦为真实约束;nationality_scope / language_requirement
     # 两个子项 v1 严格不参与任何匹配计算,豁免范围不得扩大
     recalc_trigger: phase2_only

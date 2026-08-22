@@ -1,8 +1,8 @@
 """
-记忆写入原语（BR-202 / HLD §5.3 写管线）。
+记忆写入原语（BR-202 / hld-m2-design.md §5.3 写管线）。
 
 三层落库：
-  事实层  → user_psych_profile（心理测评区块；user_profiles/match_preferences 扩展属 ③/④）
+  事实层  → user_psych_profile（心理测评区块；user_profiles/match_preferences 扩展属 BR-001 / BR-201）
   事件层  → memory_events（婚恋旅程时间线，只追加）
   情感层  → user_comm_profile（结构化摘要）+ memory_vectors（语义向量）
 

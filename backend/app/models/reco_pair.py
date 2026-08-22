@@ -5,7 +5,7 @@ from app.db.session import Base
 
 class RecoPair(Base):
     """
-    推荐"用户对"（BR-301/302，推荐信制核心表）。
+    推荐"用户对"（BR-301, BR-302，推荐信制核心表）。
     一行 = 一对（user_low_id < user_high_id），双方各收到一封指向对方的推荐信。
     生命周期: draft(T-3) → review(T-2 生成后) → approved/rejected(T-1 人工终审)
              → delivered(T0) → matched / closed / expired
@@ -57,7 +57,7 @@ class RecoPair(Base):
 
 class Notification(Base):
     """
-    站内信（HLD §8 通知服务·必达底座）。取代 v1.0 的桩实现。
+    站内信（hld-m2-design.md §8 通知服务·必达底座）。取代 v1.0 的桩实现。
     Web Push / 邮件为触达通道，本表是所有通知的落库真相源。
     """
     __tablename__ = "notifications"

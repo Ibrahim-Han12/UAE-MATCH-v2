@@ -297,7 +297,7 @@ def send_message(
     )
     
     # 长期记忆注入（BR-202 三层记忆）：结构化画像摘要 + 向量检索 top-3 相关记忆
-    # （取代旧滚动摘要，CLAUDE §3 记忆架构 / §4 top-3 成本纪律）
+    # （取代旧滚动摘要，BR-202 记忆架构 / PRD 5.6 top-3 成本纪律）
     from app.core.memory import reader as memory_reader
     memory_summary = memory_reader.build_profile_summary(db, current_user.id)
     try:

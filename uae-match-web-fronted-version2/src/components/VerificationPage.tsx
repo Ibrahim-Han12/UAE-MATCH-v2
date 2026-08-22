@@ -1,5 +1,5 @@
 /**
- * 身份核验页（BR-107，S2 阶段）。合规卖点前置展示："平台不存储证件图像"。
+ * 身份核验页（BR-107，S2 状态）。合规卖点前置展示："平台不存储证件图像"。
  * 真实 KYC SDK（B1 定型后）在 startKyc 返回的会话里唤起；当前 mock 通道提供开发按钮。
  */
 import { useEffect, useState } from 'react';

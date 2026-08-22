@@ -85,7 +85,7 @@ def get_current_active_user(
 
 def require_state(min_state: str):
     """
-    状态机门禁依赖工厂（HLD §4.2）。用法：
+    状态机门禁依赖工厂（hld-m2-design.md §4.2）。用法：
         @router.get("/recommendations", dependencies=[Depends(require_state("S4"))])
     或   user: User = Depends(require_state("S3"))
     不满足时返回 403 结构化响应（code=gate_blocked, gate=interview/verification/payment），

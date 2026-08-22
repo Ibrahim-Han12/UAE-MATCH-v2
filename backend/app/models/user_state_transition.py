@@ -5,7 +5,7 @@ from app.db.session import Base
 
 class UserStateTransition(Base):
     """
-    用户状态机转移留痕（HLD §4.1，决策 D1=独立转移表）。
+    用户状态机转移留痕（hld-m2-design.md §4.1，DEC-006 独立转移表）。
     每次 S0-S7 状态跃迁一条记录：漏斗埋点（PRD 15）与决策回溯（PRD 5.4）的数据源。
     """
     __tablename__ = "user_state_transitions"

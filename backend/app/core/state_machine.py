@@ -1,5 +1,5 @@
 """
-用户状态机（PRD 2.2 / HLD §4）。
+用户状态机（PRD 2.2 / hld-m2-design.md §4）。
 
 S0 访客(无账号,不落库) → S1 已注册 → S2 深访完成 → S3 已验证候补 → S4 付费会员
 → S5 配对中；S6 已毕业；S7 封禁。
@@ -93,7 +93,7 @@ def meets_min_state(user: User, min_state: str) -> bool:
 
 
 def gate_error(user: User, min_state: str) -> HTTPException:
-    """构造结构化"闸门未过"响应，前端据此导流（HLD §4.2）。"""
+    """构造结构化"闸门未过"响应，前端据此导流（hld-m2-design.md §4.2）。"""
     current = effective_state(user)
     if current == S7:
         return HTTPException(

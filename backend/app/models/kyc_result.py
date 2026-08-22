@@ -34,7 +34,7 @@ class KycResult(Base):
 
 class BannedIdentity(Base):
     """
-    永久拦截名单（A5 裁决 / PRD 3.5）：实锤欺诈/严重违规者的 EID 单向哈希。
+    永久拦截名单（DEC-005 / PRD 3.5）：实锤欺诈/严重违规者的 EID 单向哈希。
     同一身份重新注册在 KYC 环节即拦截；不受注销审计 12 个月清除影响。
     """
     __tablename__ = "banned_identities"
@@ -47,7 +47,7 @@ class BannedIdentity(Base):
 
 class AccountDeletionAudit(Base):
     """
-    注销最小合规审计记录（A5 裁决）：脱敏哈希 + 时间 + 原因码 + KYC 事务 ID，保留 12 个月。
+    注销最小合规审计记录（DEC-005）：脱敏哈希 + 时间 + 原因码 + KYC 事务 ID，保留 12 个月。
     级联删除执行后本表是该用户唯一残留。
     """
     __tablename__ = "account_deletion_audits"

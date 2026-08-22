@@ -1,5 +1,5 @@
 """
-通知服务（HLD §8）：站内信必达底座 + Web Push 主通道 + 邮件兜底。
+通知服务（hld-m2-design.md §8）：站内信必达底座 + Web Push 主通道 + 邮件兜底。
 
 M2 范围：站内信真实落库（废除 v1.0 桩）；Push/Email 为适配器骨架（mock 记日志），
 供应商/VAPID 就绪后换实现不动业务代码。每次发送记 notification_sent 事件（到达率埋点）。

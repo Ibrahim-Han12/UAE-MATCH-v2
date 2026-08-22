@@ -1,7 +1,7 @@
 """
-推荐信用户端点（BR-301/303 / PRD 6.2-6.5）。
+推荐信用户端点（BR-301, BR-303 / PRD 6.2-6.5）。
 
-付费墙（A4 裁决）：查看详情与回应需 S4；S3 只见 teaser。
+付费墙（DEC-004）：查看详情与回应需 S4；S3 只见 teaser。
 三动作（PRD 6.3）：愿意认识 / 想再了解(延48h一次) / 这次不合适(强制结构化理由)。
 双方接受 → 建 MatchPair + S4→S5 + 通知（永不披露被谁拒绝及理由）。
 """
@@ -139,7 +139,7 @@ def respond(
         setattr(pair, f"response_{side}", "decline")
         setattr(pair, f"decline_reason_{side}", body.decline_reason)
         pair.status = "closed"
-        # 理由回流事件层（匹配模型迭代养料，BR-303/304）
+        # 理由回流事件层（匹配模型迭代养料，BR-303, BR-304）
         memory_writer.append_event(db, current_user.id, "reco_declined",
                                    payload={"reco_pair_id": pair.id, "reason": body.decline_reason})
         log_event(db, user_id=current_user.id, event_type="reco_declined",

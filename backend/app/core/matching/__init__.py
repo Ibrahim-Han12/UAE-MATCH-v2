@@ -1,5 +1,5 @@
 """
-推荐流水线（⑤，BR-301/302/307）。
+推荐流水线（BR-301, BR-302, BR-307）。
 
 config   —— matching_config.yaml 加载（权重/阈值唯一来源）
 engine   —— T-3 四段漏斗计算（Stage0-3 + min双向 + 分配约束）

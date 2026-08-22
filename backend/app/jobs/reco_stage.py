@@ -1,5 +1,5 @@
 """
-推荐流水线 cron 入口（D4=B：OS cron 触发独立脚本，幂等按周批次 ID）。
+推荐流水线 cron 入口（DEC-009：OS cron 触发独立脚本，幂等按周批次 ID）。
 
 排程（PRD 6.1）：
     T-3 周二   python -m app.jobs.reco_stage --stage t3

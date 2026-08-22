@@ -1,5 +1,5 @@
 """
-深访配置加载器（PRD 5.3.5 三层分离之 L1 Schema + L2 问法库）。
+深访配置加载器（PRD 5.3.5 三层分离之 Schema 层 + 问法库层）。
 
 铁律：字段清单与问法只存在于 backend/config/interview/*.yaml，
 禁止写入系统 prompt；本模块是编排器/抽取器读取配置的唯一入口。

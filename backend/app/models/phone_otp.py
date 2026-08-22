@@ -5,7 +5,7 @@ from app.db.session import Base
 
 class PhoneOtp(Base):
     """
-    手机 OTP 验证码（BR-001/108，PRD 3.1）。
+    手机 OTP 验证码（BR-001, BR-108，PRD 3.1）。
     码不存明文（sha256 哈希）；6 位、5 分钟有效、60 秒重发冷却、单号每日 ≤5 条。
     """
     __tablename__ = "phone_otps"

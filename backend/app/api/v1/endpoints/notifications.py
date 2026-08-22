@@ -1,5 +1,5 @@
 """
-通知端点（HLD §8 站内信必达底座）。v1.0 桩实现已由真实落库取代。
+通知端点（hld-m2-design.md §8 站内信必达底座）。v1.0 桩实现已由真实落库取代。
 """
 from typing import Any, Optional
 
