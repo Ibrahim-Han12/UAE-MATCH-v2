@@ -20,6 +20,7 @@ class Task:
     PROACTIVE_CARE = "proactive_care"                # L3 主动关怀 —— mini
     MEMORY_EXTRACTION = "memory_extraction"          # 记忆抽取 —— mini
     MODERATION = "moderation"                        # 内容审核 —— mini
+    INTENT_CLASSIFY = "intent_classify"              # 对话意图分类 —— mini
     REGISTRATION = "registration"                    # 引导注册对话 —— mini
 
 
@@ -41,6 +42,7 @@ TASK_TIER = {
     Task.PROACTIVE_CARE: "mini",
     Task.MEMORY_EXTRACTION: "mini",
     Task.MODERATION: "mini",
+    Task.INTENT_CLASSIFY: "mini",
     Task.REGISTRATION: "mini",
 }
 
