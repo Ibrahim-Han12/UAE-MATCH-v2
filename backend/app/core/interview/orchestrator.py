@@ -8,14 +8,15 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import yaml
 from sqlalchemy.orm import Session
 
 from app.core import state_machine as sm
 from app.core.ai import get_ai_gateway, Task
-from app.core.dialogue import output_check
+from app.core.dialogue import acts, intent, output_check, refusal
+from app.core.dialogue import state as dstate
 from app.core.interview import config as ic
 from app.core.interview import field_mapping
 from app.core.memory import extractor, reader
@@ -32,13 +33,7 @@ SESSION_SOFT_CAP_TURNS = 18  # 首次会话软上限（PRD 5.1：15-20 个提问
 FATIGUE_SHORT_LEN = 6        # 疲劳信号：连续短回答阈值（字符）
 FATIGUE_WORDS = ("嗯", "都行", "随便", "还好", "不知道", "哦")
 
-# 明确停止意愿（比疲劳信号更强）：命中即本轮收尾，绝不再问（PRD 5.1：节奏由用户掌控）
-STOP_PHRASES = ("不想聊", "不想回答", "不聊了", "不说了", "先到这里", "改天", "下次再",
-                "暂停", "停一下", "别问了")
-
-# 前进意愿（与停止相反：用户想知道离下一步还差多远）——如实报缺口，不当作要停
-PROCEED_PHRASES = ("下一步", "下一个页面", "换个页面", "进入下一", "还差什么", "还差多少",
-                   "还要聊多久", "什么时候能", "进度怎么", "跳过")
+# 停止／前进等意图判定已迁至 app.core.dialogue.intent（关键词表降级为分类失败兜底）
 
 _CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
@@ -97,26 +92,22 @@ def detect_fatigue(history: List[AIConversation]) -> bool:
     return short >= 3 or perfunctory >= 2
 
 
-def compute_progress(db: Session, user_id: int) -> Dict[str, Any]:
+def compute_progress(db: Session, user_id: int,
+                     declined: Optional[Set[str]] = None) -> Dict[str, Any]:
+    """完成度按 filled ∪ declined 计（DEC-028：declined 视为已处理）。
+
+    地板字段（DEC-033）永远不进 declined，因此永远计入缺口——这是堵住
+    "25 项全拒也能过闸"的那道口子。
+    """
     filled = field_mapping.get_filled_field_ids(db, user_id)
-    completion = ic.compute_completion(filled)
+    handled = set(filled) | set(declined or ())
+    completion = ic.compute_completion(handled)
     missing = [
         f["id"] for f in ic.completion_fields()
-        if f.get("source") == "interview" and f["id"] not in filled
+        if f.get("source") == "interview" and f["id"] not in handled
     ]
-    return {"completion": completion, "filled": sorted(filled), "missing_must": missing}
-
-
-def _pick_target(missing_must: List[str], sensitive_ok: bool) -> Optional[dict]:
-    """按 Schema 顺序取第一个缺口；未获敏感授权时跳过 high 字段。"""
-    for fid in missing_must:
-        f = ic.field_by_id(fid)
-        if f is None:
-            continue
-        if not sensitive_ok and f.get("sensitivity") == "high":
-            continue
-        return f
-    return None
+    return {"completion": completion, "filled": sorted(filled),
+            "handled": sorted(handled), "missing_must": missing}
 
 
 def _known_facts_block(db: Session, user_id: int) -> str:
@@ -133,6 +124,51 @@ def _known_facts_block(db: Session, user_id: int) -> str:
     else:
         facts.append("婚史：未知")
     return "；".join(facts)
+
+
+_ACT_INSTRUCTIONS = {
+    "act1": (
+        "【本幕模式·自由对话】现在是了解他基本情况的阶段。顺着他的话聊，"
+        "一轮一个问题，先回应再问。他跑题聊到别的照常顺势采集，不用拉回来。"
+    ),
+    "act2": (
+        "【本幕模式·择偶条件】现在进入最关键的一段：他想找什么样的人。"
+        "这一段有几项要连着聊，所以每两项之间必须垫一句有信息量的反应——"
+        "对他上一个答案的判断、你的经验、或者本地的实际情况。"
+        "禁止机械过渡：不要用「好的」这类空话做衔接。"
+        "每项采到值之后，追加确认一次弹性：这条是硬线，还是遇到合适的人可以松一松。"
+    ),
+    "act3": (
+        "【本幕模式·情境题】最后几个轻松的小场景。"
+        "用闲聊的口吻抛出情境（「问个日常的」「聊个场景」），一题一答，答完自然接一句就好。"
+        "绝不能让他觉得自己在被打分、被分析，也不要用任何带考核意味的说法。"
+    ),
+}
+
+# 意图 → 轮指令（HLD §2 路由表中由指令承载的三种；stop/proceed/refusal_field 有专门分支）
+_INTENT_INSTRUCTIONS = {
+    "correction": (
+        "【纠正指令】用户在更正之前的信息或你的假设。先明确确认这个更正"
+        "（说清你记下的是什么），绝不装作没听见、也不要辩解。确认之后再自然地"
+        "接着往下聊，本轮可以不提新问题。"
+    ),
+    "ask_ai": (
+        "【反问指令】用户在问你本人的事。先如实、简短地答他这个问题——"
+        "不要绕开，不要反过来先问他。答完再自然回到刚才的话题。"
+    ),
+    "smalltalk": (
+        "【闲聊指令】用户聊的是与当前话题无关的事。接住它，给一句短而有内容的回应，"
+        "然后顺势回到刚才的话题——不要生硬拉回，也不要陪着无目的地聊下去。"
+    ),
+}
+
+
+def act_instruction(act: str) -> str:
+    return _ACT_INSTRUCTIONS[act]
+
+
+def intent_instruction(kind: str) -> str:
+    return _INTENT_INSTRUCTIONS[kind]
 
 
 def _build_suggestion_block(db: Session, user_id: int, field: dict) -> str:
@@ -226,22 +262,58 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     history = _recent_history(db, user.id)
     _save_msg(db, user.id, "user", message)
 
-    # 2) 抽取本轮信息（mini 档，系统侧不占配额）——先抽再问，缺口计算才准确
+    # 2) 幕状态（DEC-032）与本轮意图（DEC-031）——都要在抽取之前：抽取按幕限定范围
+    st = dstate.get_or_create(db, user.id)
+    declined = dstate.declined_set(st)
+    pre = compute_progress(db, user.id, declined=declined)
+    current_act = dstate.sync_act(db, st, set(pre["handled"]))
+    pre_target = acts.next_target(set(pre["handled"]), sensitive_ok)
+    turn_intent = intent.classify(db, user.id, message,
+                                  current_field_id=(pre_target or {}).get("id"))
+
+    # 3) 抽取本轮信息（mini 档，系统侧不占配额）——只抽当前幕 + 上一幕补漏
+    #    现状每轮抽全 Schema 25+ 项，prompt 长且命中散（hld-dialogue-system.md §4）
     recent_text = "\n".join(
         f"{'用户' if h.role == 'user' else '小缘'}: {h.content}" for h in history[-4:]
     ) + f"\n用户: {message}"
+    scoped = acts.act_field_ids(current_act)
+    _idx = acts.ACTS.index(current_act)
+    if _idx > 0:
+        scoped = acts.act_field_ids(acts.ACTS[_idx - 1]) + scoped
     try:
-        extracted = extractor.extract_from_conversation(db, user.id, recent_text)
+        extracted = extractor.extract_from_conversation(
+            db, user.id, recent_text, field_ids=scoped)
         if extracted:
             extractor.apply_extracted(db, user.id, extracted, mode="interview")
             db.flush()
     except Exception:
         logger.exception("深访抽取失败（不阻塞对话） user_id=%s", user.id)
 
-    # 3) 缺口与状态
-    progress = compute_progress(db, user.id)
-    stop_intent = any(p in message for p in STOP_PHRASES)
-    proceed_intent = (not stop_intent) and any(p in message for p in PROCEED_PHRASES)
+    # 4) 抽取后重算缺口与幕，并落本轮意图
+    progress = compute_progress(db, user.id, declined=declined)
+    current_act = dstate.sync_act(db, st, set(progress["handled"]))
+    target = acts.next_target(set(progress["handled"]), sensitive_ok)
+    stop_intent = turn_intent.kind == "stop"
+    proceed_intent = turn_intent.kind == "proceed"
+
+    # 5) 拒答记账 —— 与"本轮说什么"解耦。即便本轮要收尾，账也必须记：
+    #    否则用户用短句拒答会一路触发疲劳收尾，字段永远不被 declined，
+    #    完成度永远到不了 100%，深访无法完成。
+    refusal_decision = None
+    if turn_intent.kind == "refusal_field" and turn_intent.field_id:
+        refused_fid = turn_intent.field_id
+        prior_refusals = dstate.refusal_count(st, refused_fid)
+        refusal_decision = refusal.decide(refused_fid, prior_refusals=prior_refusals)
+        dstate.bump_refusal(db, st, refused_fid)
+        if refusal_decision == refusal.DECLINE:
+            dstate.mark_declined(db, st, refused_fid)
+            declined = dstate.declined_set(st)
+            progress = compute_progress(db, user.id, declined=declined)
+            current_act = dstate.sync_act(db, st, set(progress["handled"]))
+            target = acts.next_target(set(progress["handled"]), sensitive_ok)
+        log_event(db, user_id=user.id, event_type="field_refused",
+                  metadata={"field_id": refused_fid, "decision": refusal_decision,
+                            "prior_refusals": prior_refusals, "act": current_act})
     fatigue = detect_fatigue(history + [type("M", (), {"role": "user", "content": message})()])
     session_turns = sum(1 for h in history if h.role == "user") + 1
     wrap_up = stop_intent or fatigue or session_turns >= SESSION_SOFT_CAP_TURNS
@@ -249,9 +321,9 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     completed = False
     if not progress["missing_must"]:
         completed = _complete_interview(db, user)
-        progress = compute_progress(db, user.id)
+        progress = compute_progress(db, user.id, declined=declined)
 
-    # 4) 组装本轮指令
+    # 6) 组装本轮指令
     system_prompt = _load_persona_prompt()
     memory_block = reader.build_profile_summary(db, user.id)
     if memory_block:
@@ -280,10 +352,18 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
         )
     elif wrap_up:
         instruction = "【收尾指令】检测到用户疲劳或本次会话已到软上限。立即温和收尾并给正反馈（如'今天已经够我为你准备第一步了，剩下的我们边处边聊'），本轮不再提任何新问题。"
+    elif refusal_decision is not None:
+        # 记账已在上面完成；本分支只决定"怎么说"
+        instruction = refusal.instruction_for(
+            refusal_decision,
+            ic.field_by_id(turn_intent.field_id) or {"id": turn_intent.field_id},
+        )
+    elif turn_intent.kind in _INTENT_INSTRUCTIONS:
+        instruction = intent_instruction(turn_intent.kind)
     else:
-        target = _pick_target(progress["missing_must"], sensitive_ok)
         if target is not None:
-            instruction = _build_suggestion_block(db, user.id, target)
+            instruction = (act_instruction(current_act) + "\n"
+                           + _build_suggestion_block(db, user.id, target))
         else:
             instruction = "【本轮建议】剩余待采信息均为敏感项，但用户尚未授权敏感画像采集。自然地聊当前话题，并在合适时机说明授权的价值（不施压）。"
 
@@ -293,7 +373,7 @@ def handle_message(db: Session, user: User, message: str, sensitive_ok: bool) ->
     messages.append({"role": "user", "content": message})
     messages.append({"role": "system", "content": instruction})
 
-    # 5) 生成 + 语气闸（output_check）：hard 违规重生成一次并携带违规说明，仍违规则放行 + 埋点
+    # 7) 生成 + 语气闸（output_check）：hard 违规重生成一次并携带违规说明，仍违规则放行 + 埋点
     last: Dict[str, Any] = {}
 
     def _generate(hint: Optional[str]) -> str:
