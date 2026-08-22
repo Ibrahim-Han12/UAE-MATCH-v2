@@ -11,7 +11,7 @@
 """
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import yaml
 
@@ -96,6 +96,11 @@ def bank_entry_for(field_id: str) -> Optional[Dict[str, Any]]:
         if field_id in (entry.get("fields") or []):
             return entry
     return None
+
+
+def floor_field_ids() -> Set[str]:
+    """拒答地板字段（DEC-033）：不允许 declined，缺失则完成度不推进。"""
+    return {f["id"] for f in schema_fields() if f.get("refusal_floor") is True}
 
 
 def validate() -> List[str]:

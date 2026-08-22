@@ -190,6 +190,7 @@ fields:
       accept_partner_with_children: {type: enum, enum: [yes, no, depends]}   # PRD 5.2 明确必含
     sensitivity: high
     recalc_trigger: true
+    refusal_floor: true             # DEC-033:不允许 declined;拒答换问法重试 1 次后明确告知影响
 
   - id: B4
     key: parents_care_plan
@@ -248,6 +249,7 @@ fields:
     elasticity: true
     sensitivity: low
     recalc_trigger: true            # 弹性收紧(negotiable→hard)等效新增硬约束(PRD 5.4-⑧)
+    refusal_floor: true             # DEC-033:不允许 declined;拒答换问法重试 1 次后明确告知影响
 
   - id: C2
     key: partner_height_req
@@ -304,6 +306,7 @@ fields:
     elasticity: per_item             # C 类"每项带弹性系数"(PRD 5.2)在本字段落为条目级
     sensitivity: medium
     recalc_trigger: true
+    refusal_floor: true             # DEC-033:不允许 declined;拒答换问法重试 1 次后明确告知影响
     notes: "人工红娘方法论第一杀手锏:先排雷再谈匹配;自由表述后结构化归类"
 
   # ============ D. 价值观与关系模式(4 项,必采,情境题行为编码,不发量表) ============
