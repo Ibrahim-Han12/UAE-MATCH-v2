@@ -15,6 +15,7 @@ from sqlalchemy import or_
 
 from app.api.deps import get_db, get_current_active_user, require_state
 from app.core import notify
+from app.core import photos as photo_display
 from app.core import state_machine as sm
 from app.core.matching.config import load as load_matching_config
 from app.core.memory import writer as memory_writer
@@ -37,14 +38,17 @@ def _my_side(pair: RecoPair, user_id: int) -> Optional[str]:
     return None
 
 
-def _letter_view(pair: RecoPair, side: str) -> dict:
+def _letter_view(pair: RecoPair, side: str, db: Optional[Session] = None) -> dict:
     letter = pair.letter_for_low if side == "low" else pair.letter_for_high
     other_id = pair.user_high_id if side == "low" else pair.user_low_id
     my_response = pair.response_low if side == "low" else pair.response_high
+    # 照片在推荐理由之后展示（PRD 6.2）；只给过审照片，没有则为 None 由前端给空态
+    photo_url = photo_display.primary_photo_url(db, other_id) if db is not None else None
     return {
         "reco_pair_id": pair.id, "batch_id": pair.batch_id,
         "status": pair.status, "letter": letter,
         "target_user_id": other_id,
+        "target_photo_url": photo_url,
         "my_response": my_response,
         "delivered_at": pair.delivered_at, "expires_at": pair.expires_at,
     }
@@ -70,7 +74,7 @@ def list_my_recommendations(
         return {"paywalled": True, "teaser_count": len(active),
                 "message": "有人想认识你——开通会员即可查看与回应"}
     return {"paywalled": False,
-            "items": [_letter_view(p, _my_side(p, current_user.id)) for p in pairs]}
+            "items": [_letter_view(p, _my_side(p, current_user.id), db) for p in pairs]}
 
 
 @router.get("/{pair_id}")
@@ -86,7 +90,7 @@ def get_recommendation(
     log_event(db, user_id=current_user.id, event_type="reco_viewed",
               metadata={"reco_pair_id": pair.id})
     db.commit()
-    return _letter_view(pair, side)
+    return _letter_view(pair, side, db)
 
 
 class RespondIn(BaseModel):

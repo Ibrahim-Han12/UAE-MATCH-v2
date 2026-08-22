@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_active_user
 from app.core.config import settings
 from app.models.user import User
+from app.core import photos as photo_display
 from app.models.user_photo import UserPhoto
 from app.schemas.photo import (
     PhotoReorderRequest,
@@ -127,6 +128,9 @@ async def upload_photo(
         )
 
         db.add(photo)
+        db.flush()
+        # 首张上传自动成为主图；用户不必先理解"主图"这个概念
+        photo_display.ensure_primary(db, current_user.id)
         db.commit()
         db.refresh(photo)
 
