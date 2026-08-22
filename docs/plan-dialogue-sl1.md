@@ -61,7 +61,7 @@
 - Consumes: 无
 - Produces: `config.floor_field_ids() -> Set[str]`，返回 `{"B3", "C1", "C5"}`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `backend/tests/test_acts.py`：
 
@@ -75,12 +75,12 @@ def test_floor_fields_come_from_schema_not_code():
     assert ic.floor_field_ids() == {"C1", "C5", "B3"}
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_acts.py -v`
 Expected: FAIL —— `AttributeError: module 'app.core.interview.config' has no attribute 'floor_field_ids'`
 
-- [ ] **Step 3: 配置加标记**
+- [x] **Step 3: 配置加标记**
 
 在 `interview_schema.yaml` 的 `C1` 字段块内、`recalc_trigger` 之后加一行（`C5`、`B3` 同样处理）：
 
@@ -93,7 +93,7 @@ Expected: FAIL —— `AttributeError: module 'app.core.interview.config' has no
 - `- id: C5`（`key: dealbreakers`）块内
 - `- id: B3`（`key: children_plan`）块内
 
-- [ ] **Step 4: 实现 floor_field_ids**
+- [x] **Step 4: 实现 floor_field_ids**
 
 在 `backend/app/core/interview/config.py` 末尾（`validate()` 之前）加：
 
@@ -109,12 +109,12 @@ def floor_field_ids() -> Set[str]:
 from typing import Any, Dict, List, Optional, Set
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_acts.py -v`
 Expected: PASS
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add backend/config/interview/interview_schema.yaml backend/app/core/interview/config.py backend/tests/test_acts.py
@@ -139,7 +139,7 @@ git commit -m "feat(interview): 地板字段进 Schema 配置（DEC-033 / BR-201
   - `current_act(handled: Set[str]) -> str` —— 第一个未完成的幕；全完成返回 `"act3"`
   - `next_target(handled: Set[str], sensitive_ok: bool) -> Optional[dict]` —— 当前幕内 Schema 顺序的第一个缺口字段
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 追加到 `backend/tests/test_acts.py`：
 
@@ -196,12 +196,12 @@ def test_next_target_skips_high_sensitivity_without_consent():
     assert target is None or target.get("sensitivity") != "high"
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_acts.py -v`
 Expected: FAIL —— `ModuleNotFoundError: No module named 'app.core.dialogue.acts'`
 
-- [ ] **Step 3: 实现 acts.py**
+- [x] **Step 3: 实现 acts.py**
 
 创建 `backend/app/core/dialogue/acts.py`：
 
@@ -270,12 +270,12 @@ def next_target(handled: Set[str], sensitive_ok: bool) -> Optional[dict]:
     return None
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_acts.py -v`
 Expected: PASS（6 项）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add backend/app/core/dialogue/acts.py backend/tests/test_acts.py
@@ -303,7 +303,7 @@ git commit -m "feat(dialogue): 幕定义与切幕策略，幕字段集从 Schema
   - `state.refusal_count(st, field_id) -> int`
   - `state.sync_act(db, st, handled) -> str` —— 按 handled 重算当前幕，切幕时刷新 `act_entered_at`，返回幕名
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `backend/tests/test_dialogue_state.py`：
 
@@ -370,12 +370,12 @@ def test_sync_act_advances_and_stamps_entry_time(db):
     assert st.act_entered_at == stamp_in_act2
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_dialogue_state.py -v`
 Expected: FAIL —— `ModuleNotFoundError: No module named 'app.core.dialogue.state'`
 
-- [ ] **Step 3: 建模型**
+- [x] **Step 3: 建模型**
 
 创建 `backend/app/models/interview_state.py`：
 
@@ -413,7 +413,7 @@ class InterviewState(Base):
 from app.models.interview_state import InterviewState  # noqa: F401
 ```
 
-- [ ] **Step 4: 实现读写原语**
+- [x] **Step 4: 实现读写原语**
 
 创建 `backend/app/core/dialogue/state.py`：
 
@@ -473,12 +473,12 @@ def sync_act(db: Session, st: InterviewState, handled: Set[str]) -> str:
     return act
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_dialogue_state.py -v`
 Expected: PASS（4 项）
 
-- [ ] **Step 6: 全量回归 + 提交**
+- [x] **Step 6: 全量回归 + 提交**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest`
 Expected: 之前的 49 项 + 本任务新增全部 PASS
@@ -503,7 +503,7 @@ git commit -m "feat(dialogue): interview_state 幕状态持久化，跨天恢复
   - `decide(field_id: str, prior_refusals: int) -> str` —— `prior_refusals` 是本次之前的累计次数
   - `instruction_for(decision: str, field: dict) -> str` —— 给编排器注入的轮指令文本
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `backend/tests/test_refusal.py`：
 
@@ -562,12 +562,12 @@ def test_decline_instruction_drops_topic_permanently():
     assert "不再" in text
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_refusal.py -v`
 Expected: FAIL —— `ModuleNotFoundError: No module named 'app.core.dialogue.refusal'`
 
-- [ ] **Step 3: 实现 refusal.py**
+- [x] **Step 3: 实现 refusal.py**
 
 创建 `backend/app/core/dialogue/refusal.py`：
 
@@ -618,12 +618,12 @@ def instruction_for(decision: str, field: dict) -> str:
     )
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_refusal.py -v`
 Expected: PASS（8 项）
 
-- [ ] **Step 5: 语气闸交叉验证**
+- [x] **Step 5: 语气闸交叉验证**
 
 把三条指令文本过一遍输出校验层，确认它们本身不含禁用表达（否则模型会照抄）。追加到 `backend/tests/test_refusal.py`：
 
@@ -640,7 +640,7 @@ def test_refusal_instructions_are_themselves_clean():
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_refusal.py -v`
 Expected: PASS（9 项）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add backend/app/core/dialogue/refusal.py backend/tests/test_refusal.py
@@ -664,7 +664,7 @@ git commit -m "feat(dialogue): 字段级拒答决策 + 地板线（DEC-028, DEC-
   - `classify_by_keyword(message: str) -> Intent` —— 纯函数 fallback
   - `classify(db, user_id: int, message: str, current_field_id: Optional[str] = None) -> Intent`
 
-- [ ] **Step 1: 加 Task 常量**
+- [x] **Step 1: 加 Task 常量**
 
 在 `backend/app/core/ai/routing.py` 的 `Task` 类里，`MODERATION` 之后加一行：
 
@@ -678,7 +678,7 @@ git commit -m "feat(dialogue): 字段级拒答决策 + 地板线（DEC-028, DEC-
     Task.INTENT_CLASSIFY: "mini",
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 创建 `backend/tests/test_intent.py`：
 
@@ -772,12 +772,12 @@ def test_unknown_intent_value_is_rejected(monkeypatch):
     assert got.source == "keyword_fallback"
 ```
 
-- [ ] **Step 3: 跑测试确认失败**
+- [x] **Step 3: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_intent.py -v`
 Expected: FAIL —— `ModuleNotFoundError: No module named 'app.core.dialogue.intent'`
 
-- [ ] **Step 4: 实现 intent.py**
+- [x] **Step 4: 实现 intent.py**
 
 创建 `backend/app/core/dialogue/intent.py`：
 
@@ -875,12 +875,12 @@ def classify(db, user_id: int, message: str,
     return parsed
 ```
 
-- [ ] **Step 5: 跑测试确认通过**
+- [x] **Step 5: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_intent.py -v`
 Expected: PASS（8 项）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add backend/app/core/dialogue/intent.py backend/app/core/ai/routing.py backend/tests/test_intent.py
@@ -901,7 +901,7 @@ git commit -m "feat(dialogue): 意图层取代关键词路由，分类失败回�
 
 **背景：** 问法库里 D 类每题都有 `coding_rubric`（secure/anxious/avoidant 的行为特征），但抽取 prompt 根本没带——这是 D 类颗粒无收的第二根因。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `backend/tests/test_extraction_rubric.py`：
 
@@ -936,12 +936,12 @@ def test_non_d_class_field_gets_no_rubric():
     assert "行为编码" not in prompt
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_extraction_rubric.py -v`
 Expected: FAIL —— 前两项断言失败（rubric 文本不在 prompt 里）
 
-- [ ] **Step 3: 实现注入**
+- [x] **Step 3: 实现注入**
 
 在 `backend/app/core/memory/extractor.py` 的 `_build_extraction_prompt` 里，字段描述循环内、追加到该字段描述之后：
 
@@ -957,12 +957,12 @@ Expected: FAIL —— 前两项断言失败（rubric 文本不在 prompt 里）
 
 注意 `interview_config` 是该文件已有的 import 别名（`from app.core.interview import config as interview_config`）；若别名不同，用文件内既有名称。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_extraction_rubric.py -v`
 Expected: PASS（3 项）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add backend/app/core/memory/extractor.py backend/tests/test_extraction_rubric.py
@@ -983,7 +983,7 @@ git commit -m "feat(interview): D 类抽取注入 coding_rubric，修 D 类颗�
   - `act_instruction(act: str) -> str` —— 幕交互模式指令（act1 自由对话 / act2 明示环节逐项快问 / act3 情境题）
   - `compute_progress(db, user_id)` 的 `handled` 计入 `declined`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `backend/tests/test_orchestrator_acts.py`：
 
@@ -1016,12 +1016,12 @@ def test_all_act_instructions_are_themselves_clean():
         assert result.has_hard is False, f"{act} 指令含禁用表达：{result.violations}"
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_orchestrator_acts.py -v`
 Expected: FAIL —— `AttributeError: module 'app.core.interview.orchestrator' has no attribute 'act_instruction'`
 
-- [ ] **Step 3: 实现幕指令**
+- [x] **Step 3: 实现幕指令**
 
 在 `backend/app/core/interview/orchestrator.py` 的 `_build_suggestion_block` 之前加：
 
@@ -1050,12 +1050,12 @@ def act_instruction(act: str) -> str:
     return _ACT_INSTRUCTIONS[act]
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_orchestrator_acts.py -v`
 Expected: PASS（3 项）
 
-- [ ] **Step 5: 接线 —— 完成度计入 declined**
+- [x] **Step 5: 接线 —— 完成度计入 declined**
 
 把 `compute_progress` 改为接收已处理集合。修改 `backend/app/core/interview/orchestrator.py` 的 `compute_progress`：
 
@@ -1083,7 +1083,7 @@ def compute_progress(db: Session, user_id: int,
 from typing import Any, Dict, List, Optional, Set
 ```
 
-- [ ] **Step 6: 接线 —— 幕状态与意图层前置（顺序关键）**
+- [x] **Step 6: 接线 —— 幕状态与意图层前置（顺序关键）**
 
 在 `handle_message` 里，**紧接危机分支之后、抽取之前**插入幕状态读取与意图分类。
 顺序必须是「读状态 → 算幕 → 分类意图 → 抽取（按幕限定）→ 重算进度」，因为抽取要
@@ -1121,7 +1121,7 @@ from app.core.dialogue import state as dstate
 
 删除模块顶部的 `STOP_PHRASES` 与 `PROCEED_PHRASES` 两个常量（已迁至 `intent.py`）。
 
-- [ ] **Step 7: 接线 —— 抽取按幕限定范围，然后重算进度**
+- [x] **Step 7: 接线 —— 抽取按幕限定范围，然后重算进度**
 
 把「2) 抽取本轮信息」的调用改为只抽当前幕 + 上一幕补漏（HLD §4 act-scoped targets，
 现状每轮抽全 Schema 25+ 项导致 prompt 长、命中散）：
@@ -1155,7 +1155,7 @@ from app.core.dialogue import state as dstate
     wrap_up = stop_intent or fatigue or session_turns >= SESSION_SOFT_CAP_TURNS
 ```
 
-- [ ] **Step 8: 接线 —— 意图路由表（拒答／纠正／反问／闲聊）**
+- [x] **Step 8: 接线 —— 意图路由表（拒答／纠正／反问／闲聊）**
 
 HLD §2 的意图 → 策略路由表要完整落地，不能只接 stop/proceed。在指令组装的
 `if completed:` 链里，`elif stop_intent:` **之前**依次插入三个分支：
@@ -1228,7 +1228,7 @@ def test_intent_instructions_are_themselves_clean():
         assert result.has_hard is False, f"{kind} 指令含禁用表达：{result.violations}"
 ```
 
-- [ ] **Step 9: 全量回归**
+- [x] **Step 9: 全量回归**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m pytest`
 Expected: 全部 PASS（此前 49 项 + Task 1–7 新增）
@@ -1239,12 +1239,12 @@ Expected: `OK`
 Run: `cd backend && ../.venv/Scripts/python.exe -c "import sys; sys.path.insert(0,'.'); from app.core.interview import orchestrator; from app.core.dialogue import acts, intent, refusal, state; print('导入 OK')"`
 Expected: `导入 OK`
 
-- [ ] **Step 10: 建表**
+- [x] **Step 10: 建表**
 
 Run: `cd backend && ../.venv/Scripts/python.exe -m scripts.dev_migrate`
 Expected: 无异常；`interview_state` 表建出。**若本地无 Postgres，本步跳过并在提交说明里注明未验证。**
 
-- [ ] **Step 11: 提交**
+- [x] **Step 11: 提交**
 
 ```bash
 git add backend/app/core/interview/orchestrator.py backend/tests/test_orchestrator_acts.py
@@ -1274,3 +1274,39 @@ git commit -m "feat(dialogue): 编排器接入意图层与三幕状态机，抽�
 ## 已知依赖缺口
 
 `act1 → act2` 与 `act2 → act3` 的**幕切换话术**未在人格资产 v1.1 中提供（见 persona-voice-guide.md「已知缺口」）。Task 7 的 `act2` 指令里用工程口吻写了"现在进入最关键的一段"作为占位；产品负责人补出正式话术后，替换 `_ACT_INSTRUCTIONS["act2"]` 的首句即可，不动其余逻辑。
+
+
+---
+
+## 实施记录（2026-08-22 完成）
+
+七个任务全部落地，91 项测试通过，compileall 通过。提交：`331bfb6` → `178464c`。
+
+### 与计划的偏差（三处，均为执行中发现的真实问题）
+
+| # | 偏差 | 原因 |
+|---|---|---|
+| 1 | 新建 `backend/tests/conftest.py`，`db` fixture 用 `pkgutil` 自动导入 `app.models` 全部模块 | 计划把 fixture 写在测试文件里，但 `app/models/__init__.py` 只显式登记 BR-202 之后的新表；`users`/`user_profiles` 等早期表由各自模块定义，不全部导入则 `create_all` 因外键找不到 `users` 而失败 |
+| 2 | act3 指令**不点名**"评估/测试/量表"等禁用词，改为正面描述口吻 | 计划的 act3 指令里写出了这些词，但它们本身在 `voice_rules.yaml` 的 `assessment_words` 组里——指令进 prompt 就会被自己的语气闸判违规。更本质的理由：在指令里写出禁用词等于给模型做近距离示范，与 Voice Guide 的 ❌ 列不能进 prompt 同理。禁哪些词由输出侧兜住 |
+| 3 | 新增 `backend/tests/test_orchestrator_wiring.py`（7 项集成测试，假网关替三处模型调用） | 计划 Step 9 只有"全量回归"，覆盖不到 `handle_message` 本身——而它是整个 SL1 最risky的部分。这个测试立刻抓到了下面那个缺陷 |
+
+### 集成测试发现的缺陷（计划未预见）
+
+**疲劳收尾吞掉拒答记账。** 用户用短句拒答（"不想说"3 字）会触发疲劳信号，而 `wrap_up`
+分支排在拒答分支之前——于是 `bump_refusal` / `mark_declined` 从不执行。后果是死循环：
+用户下次回来再短句拒答，又触发疲劳，字段永远不被 `declined`，完成度永远到不了 100%，
+深访无法完成。
+
+修法：把**记账**与**本轮说什么**解耦。记账在指令组装之前无条件执行（即便本轮要收尾），
+指令链只决定措辞。已由 `test_terse_refusal_is_still_accounted_when_fatigue_wraps_up` 锁住。
+
+### 两处发现的假通过（测试自身的问题）
+
+- `"unclear" in prompt` 会被 D1 枚举值 `mixed_unclear` 的子串命中 → 改为断言完整指令句
+- 危机话术绕过测试的"反证"断言暴露了：现有危机话术本身就干净（105 字未超限），
+  原断言是白过的 → 改用必然违规的文本证明绕过，并把"危机话术自身干净"独立成回归守卫
+
+### 仍未验证
+
+`dev_migrate` 建表未跑通——本机无 Postgres（连接被拒）。`interview_state` 表结构仅经
+内存 SQLite 的 `create_all` 验证，生产建表待有库环境时确认。
