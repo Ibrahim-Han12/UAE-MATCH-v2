@@ -71,6 +71,13 @@ def _build_extraction_prompt(conversation_text: str, target_fields: List[dict]) 
             desc += f" 对象: {json.dumps(f['schema'], ensure_ascii=False, default=str)[:200]}"
         elif f.get("type") == "array":
             desc += " 数组"
+        # D 类情境题：问法库里已有 coding_rubric，但此前没进抽取契约
+        # ——这是 D 类"颗粒无收"的第二根因（hld-dialogue-system.md §4）
+        rubric = (interview_config.bank_entry_for(f["id"]) or {}).get("coding_rubric")
+        if rubric:
+            pairs = "；".join(f"{k}={v}" for k, v in rubric.items() if k != "note")
+            desc += (f"\n  行为编码规则（按用户实际做法归类，不按自我评价）：{pairs}"
+                     f"\n  不确定就输出 unclear，绝不硬编码——错的编码比缺失更糟")
         lines.append(desc)
     fields_block = "\n".join(lines)
     return f"""从以下对话中抽取用户信息。只抽取对话中确实出现的信息，未提及的字段一律不输出（禁止编造）。
