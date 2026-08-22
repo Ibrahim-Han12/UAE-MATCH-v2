@@ -6,4 +6,5 @@
 """
 from app.core.dialogue import acts  # noqa: F401
 from app.core.dialogue import output_check  # noqa: F401
+from app.core.dialogue import refusal  # noqa: F401
 from app.core.dialogue import state  # noqa: F401
